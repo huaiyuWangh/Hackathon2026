@@ -44,6 +44,8 @@ type Client struct {
 
 	upMu sync.Mutex
 	upFn func(frame []byte) // 当前连接的音频上行函数（重连时切换）
+
+	lastAudioAt time.Time // 下行音频帧到达时刻（间隔探针）
 }
 
 // New 创建设备客户端；p 为设备对外暴露的工具集合（端侧 MCP）。
@@ -243,7 +245,12 @@ func (c *Client) loop(ctx context.Context, conn *websocket.Conn) error {
 		}
 		switch {
 		case mt == websocket.BinaryMessage:
-			// 平台 TTS 的 Opus 音频帧
+			// 平台 TTS 的 Opus 音频帧；间隔偶发过大是断续的直接原因
+			now := time.Now()
+			if !c.lastAudioAt.IsZero() && now.Sub(c.lastAudioAt) > 150*time.Millisecond {
+				log.Printf("audio: 帧到达间隔 %dms（节奏异常, 断续线索）", now.Sub(c.lastAudioAt).Milliseconds())
+			}
+			c.lastAudioAt = now
 			if c.audio != nil {
 				c.audio.PlayOpus(msg)
 			}
@@ -262,18 +269,27 @@ func (c *Client) loop(ctx context.Context, conn *websocket.Conn) error {
 	}
 }
 
-// handleServerMessage 处理协议层状态消息（TTS 打断等），业务工具走 Router。
+// handleServerMessage 处理协议层状态消息（TTS 生命周期统计/打断清缓冲）。
 func (c *Client) handleServerMessage(msg []byte) {
 	var peek struct {
 		Type    string `json:"type"`
 		State   string `json:"state"`
 		Aborted bool   `json:"is_aborted"`
 	}
-	if json.Unmarshal(msg, &peek) != nil {
+	if json.Unmarshal(msg, &peek) != nil || c.audio == nil {
 		return
 	}
-	if peek.Type == "tts" && peek.State == "stop" && peek.Aborted && c.audio != nil {
-		c.audio.ClearPlayback()
+	switch {
+	case peek.Type == "tts" && peek.State == "start":
+		c.audio.ResetStats()
+		c.lastAudioAt = time.Time{}
+		c.audio.SetSpeaking(true) // 回声门控：播放中抑制上行
+	case peek.Type == "tts" && peek.State == "stop":
+		c.audio.SetSpeaking(false) // 停播后 400ms 尾音抑制再放行
+		if peek.Aborted {
+			c.audio.ClearPlayback()
+		}
+		log.Printf("%s (本句被打断=%v)", c.audio.ReportAndReset(), peek.Aborted)
 	}
 }
 

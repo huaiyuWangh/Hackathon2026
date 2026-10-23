@@ -3,7 +3,10 @@ package linx
 import (
 	"errors"
 	"fmt"
+	"log"
+	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gordonklaus/portaudio"
@@ -34,9 +37,17 @@ type audioDevice interface {
 	SetMuted(muted bool)
 	// Muted 当前是否静音。
 	Muted() bool
+	// SetSpeaking TTS 播放开始/结束（回声门控：播放中抑制上行）。
+	SetSpeaking(on bool)
+	// ResetStats 清零播放统计（tts start）。
+	ResetStats()
+	// ReportAndReset 输出并清零统计（tts stop）。
+	ReportAndReset() string
 }
 
 // portAudio 基于 PortAudio + libopus 的实现。
+// 播放走**回调模式**（音频线程主动拉取）：Go 协程阻塞式写入会被运行时
+// 调度/GC 周期性打断（实测断续的最小公分母），回调模式彻底避开。
 type portAudio struct {
 	enc *opus.Encoder
 	dec *opus.Decoder
@@ -46,6 +57,18 @@ type portAudio struct {
 	playCh chan []int16
 	quit   chan struct{}
 	once   sync.Once
+
+	firstFrameOnce sync.Once // 首帧 TTS 日志
+	decErrs        atomic.Int32
+	playDrops      atomic.Int32
+
+	pmu         sync.Mutex // 播放缓冲
+	playBuf     []int16
+	playStarted bool
+
+	gmu        sync.Mutex // 回声门控：TTS 播放中抑制上行（无耳机的半双工策略）
+	gating     bool
+	gateOpenAt time.Time
 
 	mu    sync.Mutex
 	muted bool // 默认静音，由控制页开启
@@ -64,7 +87,7 @@ func newPortAudio() (*portAudio, error) {
 	return &portAudio{
 		enc:    enc,
 		dec:    dec,
-		playCh: make(chan []int16, 128), // ~2s 缓冲
+		playCh: make(chan []int16, 128),
 		quit:   make(chan struct{}),
 		muted:  true, // 默认静音，由控制页开启
 	}, nil
@@ -80,8 +103,8 @@ func (a *portAudio) Start(onUp func(frame []byte)) error {
 	if err != nil {
 		return fmt.Errorf("audio: 打开麦克风失败(检查系统麦克风权限): %w", err)
 	}
-	outBuf := make([]int16, playChunk)
-	out, err := portaudio.OpenDefaultStream(0, audioChannels, audioRate, playChunk, outBuf)
+	// 输出用回调模式（音频线程拉取，消除 Go 调度抖动）；256 帧 ≈16ms 回调粒度
+	out, err := portaudio.OpenDefaultStream(0, audioChannels, audioRate, 256, a.outCallback)
 	if err != nil {
 		in.Close()
 		return fmt.Errorf("audio: 打开扬声器失败: %w", err)
@@ -106,7 +129,7 @@ func (a *portAudio) Start(onUp func(frame []byte)) error {
 			if err := in.Read(); err != nil {
 				continue
 			}
-			if a.Muted() {
+			if a.Muted() || a.echoGated() {
 				continue
 			}
 			n, err := a.enc.Encode(inBuf, payload)
@@ -117,27 +140,44 @@ func (a *portAudio) Start(onUp func(frame []byte)) error {
 		}
 	}()
 
-	// 播放循环：playCh 累积 → 30ms 粒度写入扬声器
+	// 供水中转：playCh → playBuf（回调线程从这里拉）
 	go func() {
-		var acc []int16
+		const maxBuf = audioRate * 3 / 2 // 1.5s 上限，防无限积压
 		for {
 			select {
 			case <-a.quit:
 				return
 			case seg := <-a.playCh:
-				acc = append(acc, seg...)
-				for len(acc) >= playChunk {
-					copy(outBuf, acc[:playChunk])
-					acc = acc[playChunk:]
-					if err := out.Write(); err != nil {
-						acc = nil
-						return
-					}
+				a.pmu.Lock()
+				if len(a.playBuf) < maxBuf {
+					a.playBuf = append(a.playBuf, seg...)
 				}
+				a.pmu.Unlock()
 			}
 		}
 	}()
 	return nil
+}
+
+// outCallback 音频线程回调：初始蓄水 300ms 后持续排空；不足补零。
+func (a *portAudio) outCallback(out []int16) {
+	const minSamples = audioRate * 300 / 1000 // 初始蓄水
+	a.pmu.Lock()
+	defer a.pmu.Unlock()
+	if !a.playStarted {
+		if len(a.playBuf) < minSamples {
+			for i := range out {
+				out[i] = 0
+			}
+			return
+		}
+		a.playStarted = true
+	}
+	n := copy(out, a.playBuf)
+	a.playBuf = a.playBuf[n:]
+	for i := n; i < len(out); i++ {
+		out[i] = 0
+	}
 }
 
 // Stop 停止并释放音频资源。
@@ -154,23 +194,45 @@ func (a *portAudio) Stop() {
 
 // PlayOpus 解码一帧 TTS 音频并入队播放。
 func (a *portAudio) PlayOpus(frame []byte) {
+	a.firstFrameOnce.Do(func() { log.Printf("audio: 收到首帧 TTS 音频 (%d 字节), 开始播放", len(frame)) })
 	pcm := make([]int16, audioRate) // 60ms@16k 上限，解码器按帧长填充
 	n, err := a.dec.Decode(frame, pcm)
 	if err != nil || n == 0 {
+		a.decErrs.Add(1)
 		return
 	}
 	select {
 	case a.playCh <- pcm[:n]:
-	default: // 播放跟不上时丢弃旧帧，避免无限积压
+	default:
+		a.playDrops.Add(1) // 播放跟不上时丢弃，避免无限积压
 	}
 }
 
-// ClearPlayback 清空待播缓冲。
+// ResetStats 清零本轮播放统计。
+func (a *portAudio) ResetStats() {
+	a.decErrs.Store(0)
+	a.playDrops.Store(0)
+}
+
+// ReportAndReset 返回并清零本轮播放统计（每句 TTS 结束时打日志用）。
+func (a *portAudio) ReportAndReset() string {
+	s := fmt.Sprintf("audio 统计: 解码失败=%d 入队丢弃=%d",
+		a.decErrs.Load(), a.playDrops.Load())
+	a.decErrs.Store(0)
+	a.playDrops.Store(0)
+	return s
+}
+
+// ClearPlayback 清空待播缓冲（外部队列 + 回调缓冲 + 蓄水闸门复位）。
 func (a *portAudio) ClearPlayback() {
 	for {
 		select {
 		case <-a.playCh:
 		default:
+			a.pmu.Lock()
+			a.playBuf = a.playBuf[:0]
+			a.playStarted = false
+			a.pmu.Unlock()
 			return
 		}
 	}
@@ -188,6 +250,67 @@ func (a *portAudio) Muted() bool {
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	return a.muted
+}
+
+// SetSpeaking 通知 TTS 播放开始/结束：播放中与结束后 400ms 内抑制上行，
+// 防止扬声器声音被自家麦克风拾回造成"自问自答"的回声循环（实测踩坑）。
+func (a *portAudio) SetSpeaking(on bool) {
+	a.gmu.Lock()
+	defer a.gmu.Unlock()
+	if on {
+		a.gating = true
+	} else {
+		a.gating = false
+		a.gateOpenAt = time.Now().Add(400 * time.Millisecond)
+	}
+}
+
+// echoGated 当前是否处于回声抑制窗口。
+func (a *portAudio) echoGated() bool {
+	a.gmu.Lock()
+	defer a.gmu.Unlock()
+	return a.gating || time.Now().Before(a.gateOpenAt)
+}
+
+// PlayTest 本地播放自检（不经平台）：阶段1按 60ms 实时节奏喂 50 帧，
+// 阶段2一次性突发 50 帧。全程应听到连续不断的 440Hz 音；有断续则本地播放有问题。
+func PlayTest() error {
+	a, err := newPortAudio()
+	if err != nil {
+		return err
+	}
+	if err := a.Start(func([]byte) {}); err != nil {
+		return err
+	}
+	defer a.Stop()
+	enc, err := opus.NewEncoder(audioRate, audioChannels, opus.AppVoIP)
+	if err != nil {
+		return err
+	}
+	feed := func(idx int) {
+		pcm := make([]int16, upSamples)
+		for i := range pcm {
+			pcm[i] = int16(12000 * math.Sin(2*math.Pi*440*float64(idx*upSamples+i)/audioRate))
+		}
+		data := make([]byte, 1024)
+		n, err := enc.Encode(pcm, data)
+		if err == nil && n > 0 {
+			a.PlayOpus(data[:n])
+		}
+	}
+	fmt.Println("阶段1: 实时节奏喂帧 3s —— 应连续")
+	for i := 0; i < 50; i++ {
+		feed(i)
+		time.Sleep(upFrameMs * time.Millisecond)
+	}
+	fmt.Println("阶段2: 突发喂帧 3s —— 抖动缓冲应吸收, 仍应连续")
+	for i := 50; i < 100; i++ {
+		feed(i)
+	}
+	fmt.Println("喂帧完毕, 等待播完…")
+	time.Sleep(5 * time.Second)
+	fmt.Println("完成: 两段都连续 → 本地播放正常, 断续来自服务端节奏或回声打断")
+	return nil
 }
 
 // MicTest 实测默认输入设备录音 dur，打印峰值（排障：权限被拒时 macOS 给全零数据）。

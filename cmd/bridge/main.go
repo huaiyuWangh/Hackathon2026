@@ -94,6 +94,8 @@ func run(argv []string) error {
 		return cmdSim()
 	case local && match(args, "mic-test"):
 		return linx.MicTest(5 * time.Second)
+	case local && match(args, "play-test"):
+		return linx.PlayTest()
 	default:
 		return fmt.Errorf("无法识别的参数 %v\n\n%s", argv, usageText)
 	}
