@@ -33,11 +33,12 @@ func NewRegistry(r ccrunner.Runner) *Registry {
 // Descriptors 返回全部工具描述（tools/list）。
 func (reg *Registry) Descriptors() []mcp.ToolDescriptor { return reg.descs }
 
-// Call 分发一次工具调用（tools/call）；未知工具返回错误。
+// Call 分发一次工具调用（tools/call）；未知工具返回 mcp.ErrUnknownTool，
+// 协议层据此回 JSON-RPC -32601。
 func (reg *Registry) Call(ctx context.Context, name string, args json.RawMessage) (*mcp.CallResult, error) {
 	h, ok := reg.handlers[name]
 	if !ok {
-		return nil, fmt.Errorf("tools: 未知工具 %q", name)
+		return nil, fmt.Errorf("%w: %q", mcp.ErrUnknownTool, name)
 	}
 	return h(ctx, args)
 }
@@ -47,11 +48,14 @@ func (reg *Registry) register(d mcp.ToolDescriptor, h Handler) {
 	reg.handlers[d.Name] = h
 }
 
-// schema 构造最简 JSON Schema。
+// schema 构造最简 JSON Schema；无必填参数时省略 required（null 不符合 MCP 惯例）。
 func schema(props map[string]any, required ...string) map[string]any {
-	return map[string]any{
+	s := map[string]any{
 		"type":       "object",
 		"properties": props,
-		"required":   required,
 	}
+	if len(required) > 0 {
+		s["required"] = required
+	}
+	return s
 }

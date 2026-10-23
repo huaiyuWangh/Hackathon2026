@@ -42,6 +42,7 @@ type ToolDescriptor struct {
 	Name        string         `json:"name"`
 	Description string         `json:"description"`
 	InputSchema map[string]any `json:"inputSchema"`
+	Type        int            `json:"type"` // 灵矓推荐格式: 0=tool 函数, 1=rpc 函数
 }
 
 // CallResult tools/call 的结果。

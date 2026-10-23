@@ -57,9 +57,9 @@ const (
 	minElapsedSeen   = 1500 * time.Millisecond // 见过 busy 后的最短判定等待
 	minElapsedUnseen = 3 * time.Second         // 从未见到 busy 的最短判定等待
 	bootTimeout      = 15 * time.Second        // claude 启动等待上限
-	uiTimeout        = 10 * time.Second        // TUI 输入框出现等待上限
+	uiTimeout        = 10 * time.Second        // TUI 输入就绪探测上限
 	busyMarker       = "esc to interrupt"      // CC 工作中的页脚标记（小写匹配）
-	inputMarker      = "❯"                     // CC 输入框标记，出现即 TUI 可接收按键
+	inputPrefix      = "❯"                     // CC 输入框行前缀
 )
 
 // NewTmux 创建 tmux 驱动的 Runner；检查 tmux/claude 可用性并装载历史状态。
@@ -107,11 +107,13 @@ func (r *TmuxRunner) Ensure(ctx context.Context) error {
 	if err := r.waitBoot(ctx); err != nil {
 		return err
 	}
-	return r.waitUI(ctx)
+	return r.probeUI(ctx)
 }
 
-// waitUI 等 TUI 就绪：画面出现输入框标记 ❯。只等进程稳定不够——
-// 欢迎屏渲染期间 send-keys 的字符会被启动过程吞掉。
+// probeUI 用可回滚的按键往返探测输入就绪：键入一个字符，等它回显在输入框里
+// 再退格删除。只等 "❯" 出现不够——欢迎屏的输入框先于 Ink 输入处理就绪，
+// 提前 send-keys 会被吞掉（M1/M2 冒烟均踩坑）。仅新建会话时探测，
+// 之后的 fast-path 不打扰用户在 attach 终端里的输入。
 
 // waitBoot 等 pane 进程稳定为 node/claude（连续两次采样一致），再留 1s 渲染。
 func (r *TmuxRunner) waitBoot(ctx context.Context) error {
@@ -144,12 +146,16 @@ func (r *TmuxRunner) waitBoot(ctx context.Context) error {
 	return fmt.Errorf("ccrunner: claude 启动超时 (会话 %s), 可 tmux attach -t %s 查看现场", r.session, r.session)
 }
 
-// waitUI 等 TUI 输入框出现（实现见 Ensure 内注释）。
-func (r *TmuxRunner) waitUI(ctx context.Context) error {
+// probeUI 实现 见 Ensure 内注释。
+func (r *TmuxRunner) probeUI(ctx context.Context) error {
+	if err := tmuxRun(ctx, "send-keys", "-t", r.session, "-l", "x"); err != nil {
+		return fmt.Errorf("ccrunner: 探测按键发送失败: %w", err)
+	}
 	deadline := time.Now().Add(uiTimeout)
 	for time.Now().Before(deadline) {
 		out, err := tmuxOut(ctx, "capture-pane", "-p", "-t", r.session)
-		if err == nil && strings.Contains(out, inputMarker) {
+		if err == nil && probeEchoed(out) {
+			_ = tmuxRun(ctx, "send-keys", "-t", r.session, "BSpace")
 			return nil
 		}
 		select {
@@ -160,7 +166,18 @@ func (r *TmuxRunner) waitUI(ctx context.Context) error {
 		case <-time.After(200 * time.Millisecond):
 		}
 	}
-	return fmt.Errorf("ccrunner: claude UI 未就绪 (未见输入框), 可 tmux attach -t %s 查看现场", r.session)
+	return fmt.Errorf("ccrunner: claude 输入未就绪 (探测无回显), 可 tmux attach -t %s 查看现场", r.session)
+}
+
+// probeEchoed 判断探测字符是否已回显在输入框行（❯ ... x）。
+func probeEchoed(pane string) bool {
+	for _, line := range strings.Split(pane, "\n") {
+		t := strings.TrimRight(line, " ")
+		if len(t) > len(inputPrefix) && strings.HasPrefix(t, inputPrefix) && strings.HasSuffix(t, "x") {
+			return true
+		}
+	}
+	return false
 }
 
 // Send 非阻塞下发指令：必要时先 Ensure，然后 send-keys 文本 + Enter。

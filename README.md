@@ -19,12 +19,16 @@ bin/bridge --local tools call dev.claude.send --arg 'prompt=修复登录测试'
 make test
 ```
 
-> M0 骨架阶段：工具已注册，但 ccrunner 为占位实现，
-> 调用会提示 `ccrunner: M1 尚未实现 (tmux 驱动)`，属预期行为。
+平台消息格式模拟（M2）：stdin 逐行喂灵矓外层消息，走完整协议链路——
 
-M1 起为真实链路：`tools call dev.claude.send` 会在 tmux 会话（默认 `ccline`）
-里启动交互式 Claude Code 并提交指令，`dev.claude.status` 轮询进度，
-完成后摘要里是 CC 的实际回复。想看现场：`tmux attach -t ccline`。
+```sh
+echo '{"type":"mcp","payload":{"jsonrpc":"2.0","id":1,"method":"tools/list"}}' | bin/bridge --local sim
+echo '{"type":"mcp","payload":{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"dev.claude.send","arguments":{"prompt":"只回复: ok"}}}}' | bin/bridge --local sim
+echo '{"type":"mcp","payload":{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"dev.claude.status"}}}' | bin/bridge --local sim
+```
+
+> M1 起 `tools call` 为真实链路（tmux 里跑交互式 Claude Code），想看现场：
+> `tmux attach -t ccline`（退出按 `Ctrl+b` 再按 `d`）。
 
 ## 项目结构
 
@@ -45,7 +49,7 @@ internal/config/  运行配置（环境变量）
 |------|------|------|
 | M0 | 骨架 + config + --local CLI | ✅ |
 | M1 | ccrunner：tmux 驱动交互式 CC | ✅ |
-| M2 | mcp 协议 + tools 本地全链路 | ⬜ |
+| M2 | mcp 协议 + tools 本地全链路（--local sim 平台模拟） | ✅ |
 | M3 | linx 客户端接入灵矽平台（Part 1 闭环） | ⬜ |
 | M4 | （迭代）方案B 网页查看器 | ⬜ |
 | M5 | （可选）Mac 麦克风音频 / AirPlay 演示环境 | ⬜ |

@@ -114,16 +114,17 @@ SSE 传输层，业务零改动。
 |------|------|----------|------|
 | M0 | 骨架 + config + --local CLI | `bridge --local tools list` 列出工具 | ✅ |
 | M1 | ccrunner：tmux 驱动交互式 CC、状态机、输出流 | `--local tools call dev.claude.send` 真跑（fake 程序 + 真实 CC 双冒烟通过） | ✅ |
-| M2 | mcp 协议 + tools 全链路（本地） | `--local` 全链路 + 单测 | ⬜ |
+| M2 | mcp 协议 + tools 全链路（本地） | `--local sim` 用灵矓外层消息格式驱动真实 CC 全链路通过 + 单测 | ✅ |
 | M3 | linx 客户端接入灵矽平台，控制台配智能体 | 小智/小程序语音驱动 CC | ⬜ |
 | M4 | （迭代）方案 B 网页查看器 internal/viewer | 手机浏览器实时看输出 | ⬜ |
 | M5 | （可选）Mac 麦克风音频入口 / AirPlay 演示环境 | 现场演示 | ⬜ |
 
 ## 8. M1 实现要点（2026-10-23）
 
-- **TUI 就绪检测**：只等 node 进程稳定不够——欢迎屏渲染期间 send-keys 的字符
-  会被启动过程吞掉（冒烟实测踩坑）。Ensure 在进程稳定后继续轮询画面出现输入框
-  标记 `❯` 才放行发送。
+- **TUI 就绪检测**：只等 node 进程稳定或画面出现输入框 `❯` 都不够——欢迎屏的
+  输入框先于 Ink 输入处理就绪，提前 send-keys 会被吞掉（M1/M2 冒烟两次踩坑）。
+  最终方案是**按键往返探测**：新建会话时键入一个字符，等它真实回显在输入框里
+  再退格删除，之后才放行正式发送；已存在会话走 fast-path 不打扰用户输入。
 - **完成检测启发式**：CC 工作中页脚显示 "Esc to interrupt"（busy 标记）；
   标记消失 + 画面连续 ~2s 无变化 → 任务 done；见过 busy 后最短等待 1.5s，
   从未见过 busy 最短 3s（防"刚下发就误判"）。所有常量集中在
@@ -138,7 +139,23 @@ SSE 传输层，业务零改动。
 - **验证记录**：fake 回显程序（send-keys/跨进程状态机）+ 真实 Claude Code
   v2.1.88（下发→回复→done 摘要含 `⏺ ok`/`⏺ good`）双冒烟通过。
 
-## 9. 风险与对策
+## 9. M2 实现要点（2026-10-23）
+
+- **linx.Router**：外层消息（`{"type":"mcp","payload":{...}}`）→ JSON-RPC →
+  mcp.Server 的纯编解码分发，可脱离 WebSocket 单测/模拟；通知（无 id）不回包，
+  坏 payload 回 -32700，非 mcp 类型留给 M3 音频/状态处理。
+- **`bridge --local sim`**：平台下行模拟器。stdin 逐行读外层消息，走完整协议
+  链路（Envelope→JSON-RPC→mcp→tools→ccrunner→真实 CC）后把响应外层消息写回
+  stdout。与 M3 的差别仅在传输层：把 stdin/stdout 换成设备 WebSocket。
+- **协议细节对齐灵矓文档**：tools/list 增加推荐格式的 `type` 字段（0=tool 函数）；
+  未知工具错误映射 JSON-RPC -32601（文档示例错误码）；inputSchema 无必填参数时
+  省略 `required`（不输出 null）。
+- **serve 装配预就绪**：`bridge serve` 已完成 runner→registry→linx.New 装配，
+  M3 只需实现 Client.Run 的 WebSocket 循环。
+- **验证记录**：sim 模式下 initialize / tools/list（含 type 字段）/ 未知工具
+  -32601 / send→真实 CC→done（摘要 `⏺ m2链路通`）全部通过。
+
+## 10. 风险与对策
 
 | 风险 | 对策 |
 |------|------|

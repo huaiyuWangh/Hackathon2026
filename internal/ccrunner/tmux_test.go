@@ -112,6 +112,18 @@ func TestStepCrossProcessLongGap(t *testing.T) {
 	}
 }
 
+func TestProbeEchoed(t *testing.T) {
+	if !probeEchoed("────\n❯\n────\n❯ x\n") {
+		t.Fatal("探测字符已回显应返回 true")
+	}
+	if !probeEchoed("❯ abc x") {
+		t.Fatal("输入框已有内容时应识别末尾探测字符")
+	}
+	if probeEchoed("❯\nWelcome back!\n") {
+		t.Fatal("未回显应返回 false")
+	}
+}
+
 func TestFailRunning(t *testing.T) {
 	r := &TmuxRunner{}
 	tk := &task{id: "t1", state: TaskRunning, started: time.Now()}

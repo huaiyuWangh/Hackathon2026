@@ -3,7 +3,11 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 )
+
+// ErrUnknownTool 工具未注册；按灵矓文档映射为 JSON-RPC -32601。
+var ErrUnknownTool = errors.New("mcp: 未知工具")
 
 // ToolProvider 业务工具集合，由 internal/tools 实现。
 // mcp 包只依赖此接口，保持协议层与业务层解耦。
@@ -51,7 +55,11 @@ func (s *Server) handleCall(ctx context.Context, req *Request) *Response {
 	}
 	result, err := s.provider.Call(ctx, params.Name, params.Arguments)
 	if err != nil {
-		return errResp(req.ID, ErrInternal, err.Error())
+		code := ErrInternal
+		if errors.Is(err, ErrUnknownTool) {
+			code = ErrMethodNotFound // 灵矓文档：未知工具返回 -32601
+		}
+		return errResp(req.ID, code, err.Error())
 	}
 	return ok(req.ID, result)
 }

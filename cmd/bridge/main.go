@@ -1,8 +1,10 @@
 // bridge 是灵矽语音驱动 Claude Code 的 Mac 桥接程序。
-// M0 阶段：装配骨架 + --local 本地调试 CLI；serve 模式（灵矽设备客户端）M3 实现。
+// serve=灵矓设备客户端(M3)；--local 提供不依赖平台的本地调试/模拟。
 package main
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -15,17 +17,21 @@ import (
 	"github.com/huaiyuWangh/Hackathon2026/internal/tools"
 )
 
-const usageText = `bridge — 灵矽语音驱动 Claude Code 的 Mac 桥接程序 (M0 骨架)
+const usageText = `bridge — 灵矽语音驱动 Claude Code 的 Mac 桥接程序
 
 用法:
-  bridge serve                       启动桥接服务 (灵矽设备客户端, M3 实现)
+  bridge serve                       启动桥接服务 (灵矓设备客户端, M3 实现)
   bridge --local tools list          本地调试: 列出全部工具
   bridge --local tools call <name> [--arg key=value]...
-                                     本地调试: 绕过灵矽平台直接调用工具
+                                     本地调试: 绕过灵矓平台直接调用工具
+  bridge --local sim                 平台模拟: stdin 逐行读灵矓外层消息
+                                     {"type":"mcp","payload":{JSON-RPC}}, 走完整
+                                     协议链路后将响应外层消息写回 stdout
 
 示例:
   bridge --local tools list
   bridge --local tools call dev.claude.send --arg 'prompt=修复登录测试'
+  echo '{"type":"mcp","payload":{"jsonrpc":"2.0","id":1,"method":"tools/list"}}' | bridge --local sim
 `
 
 func main() {
@@ -54,11 +60,18 @@ func run(argv []string) error {
 	switch {
 	case match(args, "serve"):
 		cfg := config.Load()
-		return linx.New(&cfg).Run(context.Background())
+		runner, err := ccrunner.NewTmux(cfg.TmuxSession, cfg.WorkDir)
+		if err != nil {
+			return err
+		}
+		defer runner.Close()
+		return linx.New(&cfg, tools.NewRegistry(runner)).Run(context.Background())
 	case local && match(args, "tools", "list"):
 		return cmdToolsList()
 	case local && match(args, "tools", "call"):
 		return cmdToolsCall(args[2:])
+	case local && match(args, "sim"):
+		return cmdSim()
 	default:
 		return fmt.Errorf("无法识别的参数 %v\n\n%s", argv, usageText)
 	}
@@ -125,4 +138,30 @@ func cmdToolsCall(args []string) error {
 	out, _ := json.MarshalIndent(res, "", "  ")
 	fmt.Println(string(out))
 	return nil
+}
+
+// cmdSim 模拟灵矽平台下行：stdin 逐行读外层消息，
+// 经 Envelope → JSON-RPC → mcp.Server → tools → ccrunner 完整链路后回写 stdout。
+// 与 M3 的差别仅在传输层：M3 把 stdin/stdout 换成设备 WebSocket。
+func cmdSim() error {
+	cfg := config.Load()
+	runner, err := ccrunner.NewTmux(cfg.TmuxSession, cfg.WorkDir)
+	if err != nil {
+		return err
+	}
+	defer runner.Close()
+	router := linx.NewRouter(tools.NewRegistry(runner))
+
+	sc := bufio.NewScanner(os.Stdin)
+	sc.Buffer(make([]byte, 64*1024), 1024*1024)
+	for sc.Scan() {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		if out := router.HandleEnvelope(line); out != nil {
+			fmt.Println(string(out))
+		}
+	}
+	return sc.Err()
 }
