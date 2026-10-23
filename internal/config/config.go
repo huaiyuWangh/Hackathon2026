@@ -27,6 +27,12 @@ type Config struct {
 	TmuxSession string
 	// WorkDir Claude Code 的工作目录（同时存放 .bridge 运行时状态）。
 	WorkDir string
+	// McpProxyBase 灵矓平台 API 基地址（MCP Proxy 用）。
+	McpProxyBase string
+	// SSEAddr 云端 MCP 的 HTTP+SSE 监听地址（配合 cloudflared 隧道暴露）。
+	SSEAddr string
+	// Audio 启用设备音频（Mac 麦克风/扬声器作为语音入口，端侧 MCP 会话关键）。
+	Audio bool
 	// Debug 输出收发的原始消息（联调排障用）。
 	Debug bool
 }
@@ -37,13 +43,16 @@ func Load() Config {
 
 	workDir := getenv("BRIDGE_WORK_DIR", ".")
 	return Config{
-		LinxWSURL:   getenv("BRIDGE_LINX_WS_URL", "wss://xrobo-io.qiniuapi.com/v1/ws/"),
-		DeviceID:    getenv("BRIDGE_DEVICE_ID", detectMAC()),
-		ClientID:    clientID(filepath.Join(workDir, ".bridge")),
-		APIKey:      getenv("BRIDGE_API_KEY", ""),
-		TmuxSession: getenv("BRIDGE_TMUX_SESSION", "ccline"),
-		WorkDir:     workDir,
-		Debug:       getenv("BRIDGE_DEBUG", "") != "",
+		LinxWSURL:    getenv("BRIDGE_LINX_WS_URL", "wss://xrobo-io.qiniuapi.com/v1/ws/"),
+		DeviceID:     getenv("BRIDGE_DEVICE_ID", detectMAC()),
+		ClientID:     clientID(filepath.Join(workDir, ".bridge")),
+		APIKey:       getenv("BRIDGE_API_KEY", ""),
+		TmuxSession:  getenv("BRIDGE_TMUX_SESSION", "ccline"),
+		WorkDir:      workDir,
+		McpProxyBase: getenv("BRIDGE_MCP_PROXY_BASE", "https://xrobo.qiniu.com"),
+		SSEAddr:      getenv("BRIDGE_SSE_ADDR", "127.0.0.1:8787"),
+		Audio:        getenv("BRIDGE_AUDIO", "") != "",
+		Debug:        getenv("BRIDGE_DEBUG", "") != "",
 	}
 }
 

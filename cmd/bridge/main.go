@@ -8,15 +8,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/huaiyuWangh/Hackathon2026/internal/ccrunner"
 	"github.com/huaiyuWangh/Hackathon2026/internal/config"
 	"github.com/huaiyuWangh/Hackathon2026/internal/linx"
+	"github.com/huaiyuWangh/Hackathon2026/internal/mcp"
 	"github.com/huaiyuWangh/Hackathon2026/internal/tools"
+	"github.com/huaiyuWangh/Hackathon2026/internal/webui"
 )
 
 const usageText = `bridge — 灵矽语音驱动 Claude Code 的 Mac 桥接程序
@@ -69,13 +73,27 @@ func run(argv []string) error {
 		defer runner.Close()
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
-		return linx.New(&cfg, tools.NewRegistry(runner)).Run(ctx)
+		reg := tools.NewRegistry(runner)
+		devClient := linx.New(&cfg, reg)
+		// 三通道并行: 设备接入(端侧MCP+音频) + MCP Proxy + HTTP(控制页/云端MCP)
+		done := make(chan error, 3)
+		go func() { done <- devClient.Run(ctx) }()
+		go func() { done <- linx.NewProxyClient(cfg.McpProxyBase, cfg.APIKey, reg).Run(ctx) }()
+		go func() {
+			sse := mcp.NewSSEServer(reg)
+			webui.Mount(sse.Mux(), devClient)
+			log.Printf("控制页 http://%s/", cfg.SSEAddr)
+			done <- sse.ListenAndServe(cfg.SSEAddr)
+		}()
+		return <-done
 	case local && match(args, "tools", "list"):
 		return cmdToolsList()
 	case local && match(args, "tools", "call"):
 		return cmdToolsCall(args[2:])
 	case local && match(args, "sim"):
 		return cmdSim()
+	case local && match(args, "mic-test"):
+		return linx.MicTest(5 * time.Second)
 	default:
 		return fmt.Errorf("无法识别的参数 %v\n\n%s", argv, usageText)
 	}

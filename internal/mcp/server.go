@@ -37,7 +37,11 @@ func (s *Server) Handle(ctx context.Context, req *Request) *Response {
 			"serverInfo":      map[string]any{"name": "bridge-mac", "version": "0.0.1"},
 		})
 	case "tools/list":
-		return ok(req.ID, map[string]any{"tools": s.provider.Descriptors()})
+		// nextCursor 显式为 null（灵矓文档标准格式），部分客户端要求该字段存在
+		return ok(req.ID, struct {
+			Tools      []ToolDescriptor `json:"tools"`
+			NextCursor *string          `json:"nextCursor"`
+		}{Tools: s.provider.Descriptors()})
 	case "tools/call":
 		return s.handleCall(ctx, req)
 	default:

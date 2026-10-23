@@ -115,9 +115,9 @@ SSE 传输层，业务零改动。
 | M0 | 骨架 + config + --local CLI | `bridge --local tools list` 列出工具 | ✅ |
 | M1 | ccrunner：tmux 驱动交互式 CC、状态机、输出流 | `--local tools call dev.claude.send` 真跑（fake 程序 + 真实 CC 双冒烟通过） | ✅ |
 | M2 | mcp 协议 + tools 全链路（本地） | `--local sim` 用灵矓外层消息格式驱动真实 CC 全链路通过 + 单测 | ✅ |
-| M3 | linx 客户端接入灵矓平台，控制台配智能体 | 设备侧✅：真实平台连接/握手/initialize+tools/list 通过（2026-10-23）；语音闭环待控制台配置 | 🔶 |
+| M3 | linx 客户端接入灵矓平台，控制台配智能体 | 设备侧✅：连接/握手/initialize+tools/list 通过；智能体侧联调完成（见 §10.1） | ✅ |
 | M4 | （迭代）方案 B 网页查看器 internal/viewer | 手机浏览器实时看输出 | ⬜ |
-| M5 | （可选）Mac 麦克风音频入口 / AirPlay 演示环境 | 现场演示 | ⬜ |
+| M5 | Mac 音频入口（realtime 模式）+ 控制页 | 对着 Mac 说话驱动 CC（待用户麦克风授权后端到端验证） | 🔶 |
 
 ## 8. M1 实现要点（2026-10-23）
 
@@ -176,6 +176,45 @@ SSE 传输层，业务零改动。
 - **待控制台完成**（语音闭环最后一步，见 linx-protocol-notes.md 待确认清单）：
   建智能体并绑定本设备（MAC f0:2f:4b:02:d7:5a）、勾选 MCP 服务、
   验证多轮工具调用（send → status 轮询 → 播报）。
+
+## 10.1 M3 智能体侧联调记录（2026-10-23 晚）
+
+用户在控制台建好智能体（Hackathon2026，绑定本机）后逐轮排障，关键结论：
+
+- **会话锚定规则（核心发现）**：只有**锚定到设备的会话**才会挂载该设备的端侧
+  工具。控制台"网页体验"/智能体直聊的会话 macAddress=智能体ID，调用工具报
+  `Tool dev.claude.send not found in plugin registry`（设备工具不在其插件注册表）。
+  灵矽没有独立 App，**语音入口就是设备本身**——因此 Mac 必须自己当语音设备
+  （见 §10.2），这也是放弃云端 SSE 方向、回归端侧 MCP 的原因。
+- **设备工具描述（控制台层）**：设备上报的工具描述只用于协议层发现；智能体
+  上下文注入的前置提示词要在「设备工具描述 API」（POST /v1/device/tools，
+  pre_prompt_texts 按语言）注册。已注册三个工具的 zh 前置提示词。
+- **智能体系统提示词**：默认是陪伴型模板（"台湾女孩"人设），永不调工具——
+  已通过 PUT /xiaozhi/agent/{id} 替换为编程助手人设（工作流程/摘要播报/危险
+  操作确认，见 §3），替换后智能体立即尝试 dev.claude.send（聊天记录实证）。
+- **意图模型**：Intent_function_call 已启用（智能体详情确认）。
+- **已否决的弯路**：MCP 市场注册私有 SSE 服务（POST /v1/mcp-store/servers）
+  在 config 校验阶段反复 "invalid mcp config"（SSE 端点可达、工具可拉取仍被拒），
+  且与端侧方向不符，已放弃；cloudflared 隧道停用。SSE 传输层代码保留
+  （internal/mcp/sse.go，本地验证可用）；MCP Proxy 探明为"平台侧作 MCP 客户端
+  的 WS 代理"（连接即发 initialize），ProxyClient 保留为备用通道。
+
+## 10.2 M5 端侧语音（Mac 即语音设备，提前实施）
+
+- **音频链路**：PortAudio（麦克风/扬声器，cgo）+ libopus；上行 16kHz 单声道
+  60ms Opus 帧，下行 TTS Opus 解码播放，`tts stop is_aborted=true` 清播放缓冲。
+  realtime 模式（`listen start`）持续上行，**VAD 与人声打断都在服务端**，设备端
+  无需唤醒词/本地 VAD。
+- **audio_params 坑**：hello 的 audio_params.format 必须是**字符串** "opus"
+  （小智协议惯例）；传数组服务端直接不回 hello（握手超时）。服务端 hello 会
+  协商回完整参数（含 play_buffer_duration=600）。
+- **控制页**（internal/webui，go:embed 单页）：http://127.0.0.1:8787/ 中间大
+  按钮开关麦克风；默认静音，点击后上行才生效。API：POST /api/mic、GET /api/status。
+- **麦克风权限坑（macOS TCC）**：无权限时系统**静默给全零音频**，无弹窗无报错，
+  服务端永远听不到。排查工具：`bridge --local mic-test`（录 5s 打印峰值）。
+  正确姿势：在用户自己的终端 App 里跑 serve（首次访问麦克风会触发授权弹窗）。
+- 依赖：`brew install portaudio opus opusfile`；Makefile 已内置
+  PKG_CONFIG_PATH（MacPorts 的 pkg-config 看不到 /usr/local）。
 
 ## 11. 风险与对策
 

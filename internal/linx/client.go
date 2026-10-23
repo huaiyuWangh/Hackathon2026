@@ -27,12 +27,23 @@ const (
 	maxBackoff      = 30 * time.Second
 )
 
-// Client 灵矽设备客户端：连接 → header 鉴权 → hello 握手 → 收发循环。
-// 无应用层心跳（官方依赖标准 WebSocket ping/pong），断线指数退避重连；
-// 会话恢复靠异步工具对：重连后智能体调 dev.claude.status 拿回现场。
+// wireMsg 一条待写消息（文本=JSON-RPC/信封，二进制=Opus 音频帧）。
+type wireMsg struct {
+	mt   int
+	data []byte
+}
+
+// Client 灵矓设备客户端：连接 → header 鉴权 → hello 握手 → 收发循环。
+// 可选音频（BRIDGE_AUDIO=1）：Mac 麦克风/扬声器即语音入口，会话锚定本设备，
+// 端侧 MCP 工具随会话可用。无应用层心跳（依赖标准 WebSocket ping/pong），
+// 断线指数退避重连；会话恢复靠异步工具对（重连后 dev.claude.status）。
 type Client struct {
 	cfg    *config.Config
 	router *Router
+	audio  audioDevice
+
+	upMu sync.Mutex
+	upFn func(frame []byte) // 当前连接的音频上行函数（重连时切换）
 }
 
 // New 创建设备客户端；p 为设备对外暴露的工具集合（端侧 MCP）。
@@ -48,6 +59,19 @@ func (c *Client) Run(ctx context.Context) error {
 	log.SetPrefix("bridge-serve ")
 	log.SetFlags(log.Ltime)
 
+	if c.cfg.Audio {
+		a, err := newPortAudio()
+		if err != nil {
+			return err
+		}
+		c.audio = a
+		defer a.Stop()
+		if err := a.Start(c.uplink); err != nil {
+			return err
+		}
+		log.Printf("音频已启动: 对着 Mac 说话即可（realtime 模式，服务端 VAD）")
+	}
+
 	backoff := initialBackoff
 	for {
 		err := c.runOnce(ctx)
@@ -61,6 +85,30 @@ func (c *Client) Run(ctx context.Context) error {
 		case <-time.After(backoff):
 		}
 		backoff = min(backoff*2, maxBackoff)
+	}
+}
+
+// SetMic 开/关麦克风上行（控制页用），返回切换后状态。
+func (c *Client) SetMic(on bool) (bool, error) {
+	if c.audio == nil {
+		return false, errors.New("音频未启用 (BRIDGE_AUDIO=1 才能控制麦克风)")
+	}
+	c.audio.SetMuted(!on)
+	return c.audio.Muted() == false, nil
+}
+
+// MicOn 麦克风是否开启。
+func (c *Client) MicOn() bool {
+	return c.audio != nil && !c.audio.Muted()
+}
+
+// uplink 音频回调：把 Opus 帧写入当前连接（无连接时丢弃）。
+func (c *Client) uplink(frame []byte) {
+	c.upMu.Lock()
+	fn := c.upFn
+	c.upMu.Unlock()
+	if fn != nil {
+		fn(frame)
 	}
 }
 
@@ -90,12 +138,22 @@ func (c *Client) runOnce(ctx context.Context) error {
 
 // handshake 发送 hello 并等待服务端 hello 应答。
 func (c *Client) handshake(conn *websocket.Conn) error {
+	audioParams := map[string]any{}
+	if c.audio != nil {
+		// 小智协议惯例：format 为字符串；参数错误服务端会直接不回 hello
+		audioParams = map[string]any{
+			"format":         "opus",
+			"sample_rate":    audioRate,
+			"channels":       audioChannels,
+			"frame_duration": upFrameMs,
+		}
+	}
 	h := Hello{
 		Type:        "hello",
 		Version:     1,
 		Features:    Features{MCP: true},
 		Transport:   "websocket",
-		AudioParams: map[string]any{},
+		AudioParams: audioParams,
 	}
 	if err := writeJSON(conn, h); err != nil {
 		return fmt.Errorf("发送 hello 失败: %w", err)
@@ -104,6 +162,9 @@ func (c *Client) handshake(conn *websocket.Conn) error {
 	_, msg, err := conn.ReadMessage()
 	if err != nil {
 		return fmt.Errorf("等待 hello 应答失败: %w", err)
+	}
+	if c.cfg.Debug {
+		log.Printf("<< %s", msg)
 	}
 	var sh ServerHello
 	if err := json.Unmarshal(msg, &sh); err != nil || sh.Type != "hello" {
@@ -114,19 +175,37 @@ func (c *Client) handshake(conn *websocket.Conn) error {
 		sid = "(无 session_id)"
 	}
 	log.Printf("握手完成 session=%s", sid)
+
+	// 音频设备：进入 realtime 监听（服务端 VAD，检测到人声自动打断 TTS）
+	if c.audio != nil {
+		if err := writeJSON(conn, map[string]any{
+			"type": "listen", "state": "start", "mode": "realtime",
+		}); err != nil {
+			return fmt.Errorf("发送 listen start 失败: %w", err)
+		}
+	}
 	return nil
 }
 
-// loop 收发循环：当前协程读消息交给 Router，单独协程负责写（响应+ping）。
-// gorilla/websocket 只允许一个并发写者，故全部写集中在 writer 协程。
+// loop 收发循环：当前协程读消息，writer 协程统一写出（gorilla 单写者约束）。
 func (c *Client) loop(ctx context.Context, conn *websocket.Conn) error {
 	conn.SetPongHandler(func(string) error {
 		return conn.SetReadDeadline(time.Now().Add(readTimeout))
 	})
 	conn.SetReadDeadline(time.Now().Add(readTimeout))
 
-	writes := make(chan []byte, 16)
-	done := make(chan struct{}) // 读循环退出信号，用于收尾 writer
+	writes := make(chan wireMsg, 256)
+	done := make(chan struct{})
+
+	// 音频上行切换到当前连接
+	c.setUplink(func(frame []byte) {
+		select {
+		case writes <- wireMsg{mt: websocket.BinaryMessage, data: frame}:
+		default: // 写队列拥堵时丢帧（实时音频宁可丢不可等）
+		}
+	})
+	defer c.setUplink(nil)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -146,8 +225,8 @@ func (c *Client) loop(ctx context.Context, conn *websocket.Conn) error {
 					conn.Close()
 					return
 				}
-			case data := <-writes:
-				if err := c.writeRaw(conn, websocket.TextMessage, data); err != nil {
+			case m := <-writes:
+				if err := c.writeRaw(conn, m.mt, m.data); err != nil {
 					conn.Close()
 					return
 				}
@@ -156,22 +235,52 @@ func (c *Client) loop(ctx context.Context, conn *websocket.Conn) error {
 	}()
 
 	for {
-		_, msg, err := conn.ReadMessage()
+		mt, msg, err := conn.ReadMessage()
 		if err != nil {
 			close(done)
 			wg.Wait()
 			return err
 		}
-		if c.cfg.Debug {
-			log.Printf("<< %s", msg)
-		}
-		if out := c.router.HandleEnvelope(msg); out != nil {
-			select {
-			case writes <- out:
-			case <-done: // 连接已断，丢弃响应
+		switch {
+		case mt == websocket.BinaryMessage:
+			// 平台 TTS 的 Opus 音频帧
+			if c.audio != nil {
+				c.audio.PlayOpus(msg)
+			}
+		case mt == websocket.TextMessage:
+			if c.cfg.Debug {
+				log.Printf("<< %s", msg)
+			}
+			c.handleServerMessage(msg)
+			if out := c.router.HandleEnvelope(msg); out != nil {
+				select {
+				case writes <- wireMsg{mt: websocket.TextMessage, data: out}:
+				case <-done: // 连接已断，丢弃响应
+				}
 			}
 		}
 	}
+}
+
+// handleServerMessage 处理协议层状态消息（TTS 打断等），业务工具走 Router。
+func (c *Client) handleServerMessage(msg []byte) {
+	var peek struct {
+		Type    string `json:"type"`
+		State   string `json:"state"`
+		Aborted bool   `json:"is_aborted"`
+	}
+	if json.Unmarshal(msg, &peek) != nil {
+		return
+	}
+	if peek.Type == "tts" && peek.State == "stop" && peek.Aborted && c.audio != nil {
+		c.audio.ClearPlayback()
+	}
+}
+
+func (c *Client) setUplink(fn func([]byte)) {
+	c.upMu.Lock()
+	c.upFn = fn
+	c.upMu.Unlock()
 }
 
 func (c *Client) writeRaw(conn *websocket.Conn, mt int, data []byte) error {
