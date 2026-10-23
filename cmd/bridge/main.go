@@ -78,6 +78,7 @@ func match(args []string, want ...string) bool {
 }
 
 func cmdToolsList() error {
+	// 仅列工具描述，用 stub 不做环境检查
 	reg := tools.NewRegistry(ccrunner.NewStub())
 	fmt.Printf("%-22s %s\n", "TOOL", "DESCRIPTION")
 	for _, d := range reg.Descriptors() {
@@ -110,7 +111,13 @@ func cmdToolsCall(args []string) error {
 	if err != nil {
 		return err
 	}
-	reg := tools.NewRegistry(ccrunner.NewStub())
+	cfg := config.Load()
+	runner, err := ccrunner.NewTmux(cfg.TmuxSession, cfg.WorkDir)
+	if err != nil {
+		return err
+	}
+	defer runner.Close()
+	reg := tools.NewRegistry(runner)
 	res, err := reg.Call(context.Background(), name, raw)
 	if err != nil {
 		return err

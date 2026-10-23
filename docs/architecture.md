@@ -113,13 +113,32 @@ SSE 传输层，业务零改动。
 | 阶段 | 内容 | 验收方式 | 状态 |
 |------|------|----------|------|
 | M0 | 骨架 + config + --local CLI | `bridge --local tools list` 列出工具 | ✅ |
-| M1 | ccrunner：tmux 驱动交互式 CC、状态机、输出流 | `--local tools call dev.claude.send` 真跑 | ⬜ |
+| M1 | ccrunner：tmux 驱动交互式 CC、状态机、输出流 | `--local tools call dev.claude.send` 真跑（fake 程序 + 真实 CC 双冒烟通过） | ✅ |
 | M2 | mcp 协议 + tools 全链路（本地） | `--local` 全链路 + 单测 | ⬜ |
 | M3 | linx 客户端接入灵矽平台，控制台配智能体 | 小智/小程序语音驱动 CC | ⬜ |
 | M4 | （迭代）方案 B 网页查看器 internal/viewer | 手机浏览器实时看输出 | ⬜ |
 | M5 | （可选）Mac 麦克风音频入口 / AirPlay 演示环境 | 现场演示 | ⬜ |
 
-## 8. 风险与对策
+## 8. M1 实现要点（2026-10-23）
+
+- **TUI 就绪检测**：只等 node 进程稳定不够——欢迎屏渲染期间 send-keys 的字符
+  会被启动过程吞掉（冒烟实测踩坑）。Ensure 在进程稳定后继续轮询画面出现输入框
+  标记 `❯` 才放行发送。
+- **完成检测启发式**：CC 工作中页脚显示 "Esc to interrupt"（busy 标记）；
+  标记消失 + 画面连续 ~2s 无变化 → 任务 done；见过 busy 后最短等待 1.5s，
+  从未见过 busy 最短 3s（防"刚下发就误判"）。所有常量集中在
+  `ccrunner/tmux.go` 顶部，随 CC 版本演进调参。
+- **跨进程状态机**：任务与采样基线持久化在工作目录 `.bridge/state.json`
+  （已 gitignore）。`--local` 下 send/status 是不同进程，status 每次调用先
+  同步采样一拍再返回；采样间隔 ≥2s 且画面未变时直接视为稳定。
+- **播报摘要**：`summarize` 从画面末尾取非 UI 装饰行（过滤边框/块元素 logo/
+  欢迎屏/页脚/空输入框），只留对话内容（如 `❯ 指令 / ⏺ 回复`）。
+- **输出流**：monitor 每 500ms capture-pane（ANSI），前缀差分出增量推送
+  `Output()` channel，无消费者时丢弃——为 M4 方案B 查看器预留。
+- **验证记录**：fake 回显程序（send-keys/跨进程状态机）+ 真实 Claude Code
+  v2.1.88（下发→回复→done 摘要含 `⏺ ok`/`⏺ good`）双冒烟通过。
+
+## 9. 风险与对策
 
 | 风险 | 对策 |
 |------|------|

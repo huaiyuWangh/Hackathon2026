@@ -22,6 +22,10 @@ make test
 > M0 骨架阶段：工具已注册，但 ccrunner 为占位实现，
 > 调用会提示 `ccrunner: M1 尚未实现 (tmux 驱动)`，属预期行为。
 
+M1 起为真实链路：`tools call dev.claude.send` 会在 tmux 会话（默认 `ccline`）
+里启动交互式 Claude Code 并提交指令，`dev.claude.status` 轮询进度，
+完成后摘要里是 CC 的实际回复。想看现场：`tmux attach -t ccline`。
+
 ## 项目结构
 
 ```
@@ -40,7 +44,7 @@ internal/config/  运行配置（环境变量）
 | 阶段 | 内容 | 状态 |
 |------|------|------|
 | M0 | 骨架 + config + --local CLI | ✅ |
-| M1 | ccrunner：tmux 驱动交互式 CC | ⬜ |
+| M1 | ccrunner：tmux 驱动交互式 CC | ✅ |
 | M2 | mcp 协议 + tools 本地全链路 | ⬜ |
 | M3 | linx 客户端接入灵矽平台（Part 1 闭环） | ⬜ |
 | M4 | （迭代）方案B 网页查看器 | ⬜ |
