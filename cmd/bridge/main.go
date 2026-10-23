@@ -9,7 +9,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/huaiyuWangh/Hackathon2026/internal/ccrunner"
 	"github.com/huaiyuWangh/Hackathon2026/internal/config"
@@ -65,7 +67,9 @@ func run(argv []string) error {
 			return err
 		}
 		defer runner.Close()
-		return linx.New(&cfg, tools.NewRegistry(runner)).Run(context.Background())
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		return linx.New(&cfg, tools.NewRegistry(runner)).Run(ctx)
 	case local && match(args, "tools", "list"):
 		return cmdToolsList()
 	case local && match(args, "tools", "call"):

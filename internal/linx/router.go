@@ -28,7 +28,7 @@ func (r *Router) HandleEnvelope(data []byte) []byte {
 		return nil
 	}
 	if env.Type != "mcp" {
-		// audio/state 等类型由 M3 的音频/状态处理接管
+		// stt/llm/tts/notify 等服务端下行：纯 MCP 设备忽略，不得影响连接
 		return nil
 	}
 	var req mcp.Request

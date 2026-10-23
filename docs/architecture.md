@@ -115,7 +115,7 @@ SSE 传输层，业务零改动。
 | M0 | 骨架 + config + --local CLI | `bridge --local tools list` 列出工具 | ✅ |
 | M1 | ccrunner：tmux 驱动交互式 CC、状态机、输出流 | `--local tools call dev.claude.send` 真跑（fake 程序 + 真实 CC 双冒烟通过） | ✅ |
 | M2 | mcp 协议 + tools 全链路（本地） | `--local sim` 用灵矓外层消息格式驱动真实 CC 全链路通过 + 单测 | ✅ |
-| M3 | linx 客户端接入灵矽平台，控制台配智能体 | 小智/小程序语音驱动 CC | ⬜ |
+| M3 | linx 客户端接入灵矓平台，控制台配智能体 | 设备侧✅：真实平台连接/握手/initialize+tools/list 通过（2026-10-23）；语音闭环待控制台配置 | 🔶 |
 | M4 | （迭代）方案 B 网页查看器 internal/viewer | 手机浏览器实时看输出 | ⬜ |
 | M5 | （可选）Mac 麦克风音频入口 / AirPlay 演示环境 | 现场演示 | ⬜ |
 
@@ -155,7 +155,29 @@ SSE 传输层，业务零改动。
 - **验证记录**：sim 模式下 initialize / tools/list（含 type 字段）/ 未知工具
   -32601 / send→真实 CC→done（摘要 `⏺ m2链路通`）全部通过。
 
-## 10. 风险与对策
+## 10. M3 实现要点（2026-10-23）
+
+- **连接与鉴权**：`wss://xrobo-io.qiniuapi.com/v1/ws/`，握手带 4 个 header：
+  `Authorization: Bearer`（.env 的 BRIDGE_API_KEY）、`Protocol-Version: 1`、
+  `Device-Id`（自动探测 en0 MAC，可用 BRIDGE_DEVICE_ID 覆盖）、`Client-Id`
+  （自动生成并持久化在 `.bridge/client-id`，重连保持不变）。
+- **hello 握手**：`{version:1, features:{mcp:true}, transport:"websocket",
+  audio_params:{}}`，等服务端 hello（10s 超时），session_id 记日志。
+- **保活与重连**：无应用层心跳，30s WebSocket ping + pong 续期读超时（90s）；
+  断线指数退避重连（1s→30s 封顶）。会话恢复靠异步工具对：智能体重连后调
+  dev.claude.status 拿回现场。
+- **.env 装载**：config 启动时读工作目录 `.env`（已 gitignore），已设置的
+  环境变量优先；`BRIDGE_DEBUG=1` 打印原始收发消息。
+- **真实平台验证记录（2026-10-23）**：连接成功 → 握手 session 下发 →
+  **平台主动** `initialize`（clientInfo=XiaozhiClient, protocolVersion=2024-11-05）
+  → `tools/list` → 我方应答三个 dev.claude.* 工具，25s 稳定无断连。
+  结论：端侧工具**无需控制台预先配置**即被平台发现；
+  Bearer 凭证（lx- key）有效；自动探测 MAC 被接受。
+- **待控制台完成**（语音闭环最后一步，见 linx-protocol-notes.md 待确认清单）：
+  建智能体并绑定本设备（MAC f0:2f:4b:02:d7:5a）、勾选 MCP 服务、
+  验证多轮工具调用（send → status 轮询 → 播报）。
+
+## 11. 风险与对策
 
 | 风险 | 对策 |
 |------|------|

@@ -10,6 +10,17 @@
 
 架构、已确认决策与里程碑详见 [docs/architecture.md](docs/architecture.md)。
 
+## 接入真实平台（M3）
+
+```sh
+cp .env.example .env   # 填入 BRIDGE_API_KEY（灵矽控制台）
+make build
+bin/bridge serve       # 上线为灵矓设备, 断线自动重连; BRIDGE_DEBUG=1 看原始消息
+```
+
+设备上线后平台会自动发现 `dev.claude.*` 工具；语音闭环还需在灵矽控制台
+建智能体并绑定本设备（详见 [docs/linx-protocol-notes.md](docs/linx-protocol-notes.md)）。
+
 ## 快速开始
 
 ```sh
@@ -50,6 +61,7 @@ internal/config/  运行配置（环境变量）
 | M0 | 骨架 + config + --local CLI | ✅ |
 | M1 | ccrunner：tmux 驱动交互式 CC | ✅ |
 | M2 | mcp 协议 + tools 本地全链路（--local sim 平台模拟） | ✅ |
+| M3 | linx 客户端接入灵矽平台 | 🔶 设备侧✅（真实连接+工具发现），语音闭环待控制台配置 |
 | M3 | linx 客户端接入灵矽平台（Part 1 闭环） | ⬜ |
 | M4 | （迭代）方案B 网页查看器 | ⬜ |
 | M5 | （可选）Mac 麦克风音频 / AirPlay 演示环境 | ⬜ |

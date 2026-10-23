@@ -76,9 +76,26 @@
 
 ## 7. 待确认清单（联调时逐项打勾）
 
-- [ ] Bearer token 到底用 tk_ 还是 lx-（或控制台另发 token）
-- [ ] 控制台设备绑定是否要求 MAC 一致（en0 填哪个）
-- [ ] 端侧 MCP 工具是否需在控制台「MCP 编辑」里出现/勾选，还是设备绑定后自动可见
+- [x] Bearer token 到底用 tk_ 还是 lx-（或控制台另发token）→ **2026-10-23 实测：.env 中的 lx- key 连接成功**
+- [x] 端侧 MCP 工具是否需在控制台「MCP 编辑」里出现/勾选，还是设备绑定后自动可见
+      → **实测：设备上线后平台主动 initialize + tools/list，无需预先配置即被发现**
+- [x] protocolVersion → **实测：平台 initialize 带 `2024-11-05`，与实现一致**
+- [x] Device-Id 用 en0 MAC → **实测：自动探测的 en0 MAC 被接受，握手成功**
+- [ ] 控制台设备绑定是否要求 MAC 一致（连接已通，绑定入口待查）
 - [ ] 智能体能否多轮工具调用（send → status 轮询 → 播报）★最大产品风险
 - [ ] tools/call 平台侧超时时长
 - [ ] 同 Device-Id 重复连接是否互踢（Client-Id 固定 vs 随机）
+
+## 8. 2026-10-23 真实平台联调记录（bridge serve, BRIDGE_DEBUG=1）
+
+```
+已连接 wss://xrobo-io.qiniuapi.com/v1/ws/ (device f0:2f:4b:02:d7:5a client cda1…)
+握手完成 session=_K8AALV1GfJ8XgYA
+<< initialize (clientInfo=XiaozhiClient, protocolVersion=2024-11-05, 带 vision 能力)
+<< tools/list (id=2, 无 params)
+>> initialize 响应 + tools/list 响应（3 个 dev.claude.* 工具）
+…25s 稳定无断连
+```
+
+平台在设备上线后**立即**主动 initialize + tools/list（无需任何触发）。
+vision 能力（url+token）我们按需忽略。
