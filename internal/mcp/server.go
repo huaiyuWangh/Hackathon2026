@@ -34,7 +34,7 @@ func (s *Server) Handle(ctx context.Context, req *Request) *Response {
 		return ok(req.ID, map[string]any{
 			"protocolVersion": "2024-11-05",
 			"capabilities":    map[string]any{"tools": map[string]any{}},
-			"serverInfo":      map[string]any{"name": "bridge-mac", "version": "0.0.1"},
+			"serverInfo":      map[string]any{"name": "bridge-mac", "version": "1.0.0"},
 		})
 	case "tools/list":
 		// nextCursor 显式为 null（灵矓文档标准格式），部分客户端要求该字段存在
