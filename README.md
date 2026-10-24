@@ -9,6 +9,20 @@
 对着任意灵矓语音入口说一句"帮我修一下失败的测试"，Mac 上的 Claude Code 就开始干活，
 大屏实时看它写代码，结果由语音读给你听。
 
+### 评委速览（30 秒版）
+
+M0–M5 于比赛首日 **6 小时 17 分**内完成并端到端验证（空仓 init → 语音闭环跑通，AI 辅助开发）；
+9 个 Go 包 68 个测试 `race` 全绿，覆盖率 66.7%（上方徽章实时可查，详见[工程效率与质量](#工程效率与质量)）。
+
+| 评审维度 | 证据速览 |
+|---|---|
+| 商业价值 & 产品设计 | 通勤修 CI / 无障碍编程的免键盘刚需 · [商业画布与 Roadmap](docs/pitch.md) |
+| 架构设计 | 端侧 MCP + tmux 唯一现场 + 四层单向依赖 · [架构决策记录](docs/architecture.md) |
+| AI 价值 | Agent 指挥 Agent，平台智能体自主调度 Claude Code · [真实语音会话实录（平台原始记录）](docs/evidence/voice-session-transcript.md) |
+| AI 工程效率 | 两天 19 提交、3 个 release，CI / lint / 覆盖率全绿 · [时间线](#工程效率与质量) |
+
+证据对照总表：[docs/rubric-mapping.md](docs/rubric-mapping.md) · AI 读者导览：[AGENTS.md](AGENTS.md)
+
 📺 演示视频：
 - [语音端到端闭环](docs/media/demo-voice-e2e-2026-10-23.mp4)（77s，语音驱动 CC + 多轮工具调用）
 - [手机网页查看器](docs/media/demo-viewer-phone-2026-10-24.mp4)（手机浏览器实时看 CC 现场，局域网直连）
@@ -35,6 +49,8 @@ flowchart TB
     T -.->|"AirPlay 镜像 Mac 屏幕"| S["大屏 / Apple TV"]
 ```
 
+**图示要点：bridge 作为灵矓设备接入平台，tmux 会话是唯一"现场"；viewer 与 AirPlay 只是同一现场的两个显示出口。**
+
 两个 AI 智能体分层协作——**Agent 指挥 Agent，人只负责说和听**：
 
 ```mermaid
@@ -55,6 +71,8 @@ sequenceDiagram
     P-->>H: TTS：文件名
 ```
 
+**图示要点：调用与轮询的节奏由智能体自主决定，人只出现在开头与结尾——"Agent 指挥 Agent"的完整闭环。**
+
 ## 三大能力
 
 | 能力 | 说明 |
@@ -71,7 +89,7 @@ sequenceDiagram
 > "测试修复了，3 个用例通过，改了 2 个文件。" 你问："动了哪个文件？"
 > "payment 下的 refund.go。" ——到家前，测试已经绿了。
 
-## 技术架构
+## 架构设计
 
 Go 单二进制 `bridge` 作为**灵矓设备**接入（端侧 MCP Server），依赖单向
 `linx → mcp → tools → ccrunner`，`viewer/webui → ccrunner`。关键设计：异步工具对、
@@ -140,6 +158,38 @@ internal/config/  运行配置（环境变量 + .env）
 
 依赖方向单向：`linx → mcp → tools → ccrunner`。
 
+## 工程效率与质量
+
+两天冲刺、全程 AI 辅助开发（Claude Code 主写代码，人做决策与验证），从空仓到 3 个 release：
+
+**Day 1（10-23）：M0–M5 端到端闭环，净 6 小时 17 分**
+
+| 时刻 | 里程碑 |
+|---|---|
+| 14:11 | 空仓 init |
+| 14:39 | [M0 骨架与方案](https://github.com/huaiyuWangh/Hackathon2026/commit/ed29071) |
+| 14:58 | [M1 tmux 驱动交互式 CC](https://github.com/huaiyuWangh/Hackathon2026/commit/e1fad84) |
+| 15:20 | [M2 协议层 + 平台模拟](https://github.com/huaiyuWangh/Hackathon2026/commit/637ffec) |
+| 15:31 | [M3 真实平台接入验证](https://github.com/huaiyuWangh/Hackathon2026/commit/7cd14cf) |
+| 19:55 | [M5 音频入口 + 联调](https://github.com/huaiyuWangh/Hackathon2026/commit/03008f6) |
+| 20:28 | [M5 ✅ 语音端到端验证通过](https://github.com/huaiyuWangh/Hackathon2026/commit/559cef3)（多轮工具调用，[实录](docs/evidence/voice-session-transcript.md)） |
+
+**Day 2（10-24）：直播、品牌与工程化**
+
+[M4 网页查看器](https://github.com/huaiyuWangh/Hackathon2026/commit/ea1bd7f) →
+[品牌定稿 VoiceCopilot](https://github.com/huaiyuWangh/Hackathon2026/commit/76af975) →
+[产品化材料](https://github.com/huaiyuWangh/Hackathon2026/commit/738250c) →
+[工程化补强](https://github.com/huaiyuWangh/Hackathon2026/commit/25b2443)（覆盖率 34.7%→66.7%、CI、codecov）→
+[v0.3.0 发布](https://github.com/huaiyuWangh/Hackathon2026/releases/tag/v0.3.0)
+
+| 指标 | 数值 |
+|---|---|
+| 提交 / 发布 | 两天 19 commits · 3 releases（v0.1.0 闭环 / v0.2.0 查看器 / v0.3.0 产品定稿+工程化） |
+| 测试 | 9 个包全覆盖 · 68 个测试函数 · `go test -race` 全绿 |
+| 覆盖率 | 66.7%（codecov 徽章实时验证） |
+| 静态检查 | golangci-lint 0 issues · gofmt 0 diff |
+| 端到端 | 语音 → 工具调用 → CC 执行 → TTS 播报，真实验证（[平台原始实录](docs/evidence/voice-session-transcript.md)） |
+
 ## 里程碑与下一步
 
 | 阶段 | 内容 | 状态 |
@@ -162,3 +212,5 @@ M6 任务驾驶舱（控制页升级任务卡片与历史）→ M7 灵矓小程�
 - AI 元素盘点与答辩话术：[AI Value](https://github.com/huaiyuWangh/Hackathon2026/issues/8) ·
   AI 工程效率证据包：[AI Efficiency](https://github.com/huaiyuWangh/Hackathon2026/issues/9)
 - 品牌资产（logo/色板）：[docs/brand/](docs/brand/)
+- 评审维度证据对照：[docs/rubric-mapping.md](docs/rubric-mapping.md) ·
+  AI 读者导览：[AGENTS.md](AGENTS.md) · [llms.txt](llms.txt)

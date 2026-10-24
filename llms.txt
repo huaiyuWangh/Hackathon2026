@@ -1,0 +1,18 @@
+# VoiceCopilot (Hackathon2026)
+
+> 语音驱动的编程副驾驶：对着灵矓（Qiniu Xrobot）语音入口说话，Mac 上的 Claude Code 干活，结果语音播报、手机/大屏实时看现场。端侧 MCP 架构，Agent 指挥 Agent。
+
+Docs:
+
+- [README](README.md): 产品页——痛点、架构双图、能力、场景、运行方式、工程数据
+- [评分证据地图](docs/rubric-mapping.md): 按评审维度索引全部证据（先看这个）
+- [真实语音会话实录](docs/evidence/voice-session-transcript.md): 端到端语音驱动 Claude Code 的平台原始记录（10 条工具调用，未改写）
+- [架构决策记录](docs/architecture.md): 端侧 MCP、tmux 唯一现场、异步工具对、双端口隔离等关键决策
+- [商业画布与 Roadmap](docs/pitch.md): 定位、用户价值、商业模式、M6–M10 演进
+- [演示剧本](docs/demo-script.md): 3 分钟路演流程与彩排记录
+- [AI 读者导览](AGENTS.md): 仓库结构与可验证命令
+
+Optional:
+
+- [灵矓协议联调笔记](docs/linx-protocol-notes.md): 平台协议实测结论与踩坑
+- [品牌资产](docs/brand/): VoiceCopilot logo 与色板
