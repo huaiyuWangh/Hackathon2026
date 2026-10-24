@@ -12,6 +12,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"github.com/huaiyuWangh/Hackathon2026/internal/brand"
 	"github.com/huaiyuWangh/Hackathon2026/internal/ccrunner"
 )
 
@@ -43,6 +44,7 @@ func Mount(mux *http.ServeMux, src Source) {
 		w.Header().Set("Content-Type", "text/css; charset=utf-8")
 		_, _ = w.Write(xtermCSS)
 	})
+	mux.HandleFunc("/viewer/icon.svg", brand.ServeIcon)
 	mux.HandleFunc("/viewer/ws", func(w http.ResponseWriter, r *http.Request) {
 		serveWS(w, r, src)
 	})

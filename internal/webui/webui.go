@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"net/http"
+
+	"github.com/huaiyuWangh/Hackathon2026/internal/brand"
 )
 
 //go:embed index.html
@@ -28,6 +30,7 @@ func Mount(mux *http.ServeMux, c Controller) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		w.Write(indexHTML)
 	})
+	mux.HandleFunc("/icon.svg", brand.ServeIcon)
 	// POST /api/mic 切换（body 可选 {"on":true} 指定目标状态），返回新状态
 	mux.HandleFunc("/api/mic", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {

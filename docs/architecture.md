@@ -3,6 +3,12 @@
 > 项目一句话：对着灵矽语音入口说一句"帮我修一下失败的测试"，Mac 上的 Claude Code
 > 开始干活，大屏上实时看它写代码，结果由语音播报回来。
 
+> **配套材料索引**：产品与商业叙事 [pitch.md](pitch.md) · 演示剧本 [demo-script.md](demo-script.md) ·
+> 品牌资产 [brand/](brand/) · 架构详述 issue
+> [#5 总体架构](https://github.com/huaiyuWangh/Hackathon2026/issues/5) ·
+> [#6 M4 查看器](https://github.com/huaiyuWangh/Hackathon2026/issues/6) ·
+> [#7 关键工程问题](https://github.com/huaiyuWangh/Hackathon2026/issues/7)
+
 ## 1. 背景与平台
 
 - **灵矽（Xrobot，七牛）**：智能体/设备平台。设备经 WebSocket

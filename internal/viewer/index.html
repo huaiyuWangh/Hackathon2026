@@ -3,19 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>CC 现场直播 · Hackathon2026</title>
+<title>VoiceCopilot · CC 现场直播</title>
+<link rel="icon" href="/viewer/icon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/viewer/xterm.css">
 <style>
   html,body{margin:0;height:100%;background:#1a1b26}
   .term{padding:6px;overflow-x:auto}
   .xterm{height:100vh}
+  #brand{position:fixed;top:8px;left:12px;font:600 12px/1.4 -apple-system,"PingFang SC",sans-serif;
+         color:#565f89;letter-spacing:.5px;user-select:none}
+  #brand b{color:#7aa2f7;font-weight:700}
   #dot{position:fixed;top:10px;right:12px;width:9px;height:9px;border-radius:50%;
        background:#f85149;box-shadow:0 0 6px rgba(248,81,73,.8);transition:background .3s}
   #dot.on{background:#3fb950;box-shadow:0 0 6px rgba(63,185,80,.8)}
 </style>
 </head>
 <body>
-<div class="term" id="term"></div><div id="dot"></div>
+<div id="brand"><b>Voice</b>Copilot · 直播</div><div class="term" id="term"></div><div id="dot"></div>
 <script src="/viewer/xterm.js"></script>
 <script>
 const dot = document.getElementById('dot');

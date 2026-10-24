@@ -3,11 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>MacCC 语音控制</title>
+<title>VoiceCopilot · 控制台</title>
+<link rel="icon" href="/icon.svg" type="image/svg+xml">
 <style>
   html,body{height:100%;margin:0}
   body{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:28px;
        background:#111;color:#eee;font-family:-apple-system,"PingFang SC",sans-serif}
+  h1{font-size:17px;font-weight:600;color:#7aa2f7;letter-spacing:.5px}
+  h1 b{color:#c0caf5}
   #btn{width:170px;height:170px;border-radius:50%;border:none;font-size:19px;cursor:pointer;
        background:#333;color:#aaa;transition:background .2s}
   #btn.on{background:#e5484d;color:#fff;animation:pulse 1.8s infinite}
@@ -18,8 +21,9 @@
 </style>
 </head>
 <body>
-  <button id="btn">开启麦克风</button>
-  <div id="state">麦克风已关闭</div>
+<h1><b>Voice</b>Copilot</h1>
+<button id="btn">开启麦克风</button>
+<div id="state">麦克风已关闭</div>
 <script>
 const btn = document.getElementById('btn'), state = document.getElementById('state');
 function render(on){

@@ -31,9 +31,10 @@ func TestViewerPageAndAssets(t *testing.T) {
 	Mount(mux, &fakeSource{ch: make(chan ccrunner.Chunk)})
 
 	for path, want := range map[string]string{
-		"/viewer":           "<!doctype html>",
+		"/viewer":           "VoiceCopilot",
 		"/viewer/xterm.js":  "!function",
 		"/viewer/xterm.css": "xterm",
+		"/viewer/icon.svg":  "<svg",
 	} {
 		resp := httptest.NewRecorder()
 		mux.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, path, nil))
