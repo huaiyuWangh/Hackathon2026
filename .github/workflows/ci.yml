@@ -60,6 +60,14 @@ jobs:
           path: coverage.txt
           retention-days: 14
 
+      # 公开仓库可无 token 上传 codecov；失败不阻断 CI（badge 稍后自然生效）
+      - name: Upload to Codecov
+        if: success()
+        uses: codecov/codecov-action@v5
+        with:
+          files: coverage.txt
+          fail_ci_if_error: false
+
   lint:
     runs-on: ubuntu-latest
     timeout-minutes: 15

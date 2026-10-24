@@ -2,6 +2,9 @@
   <img src="docs/brand/logo-banner.svg" alt="VoiceCopilot" width="720">
 </p>
 
+[![CI](https://github.com/huaiyuWangh/Hackathon2026/actions/workflows/ci.yml/badge.svg)](https://github.com/huaiyuWangh/Hackathon2026/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/huaiyuWangh/Hackathon2026/graph/badge.svg)](https://codecov.io/gh/huaiyuWangh/Hackathon2026)
+
 **VoiceCopilot** —— Hackathon2026 参赛项目，基于灵矓（Qiniu Xrobot）平台的语音编程副驾驶。
 对着任意灵矓语音入口说一句"帮我修一下失败的测试"，Mac 上的 Claude Code 就开始干活，
 大屏实时看它写代码，结果由语音读给你听。
