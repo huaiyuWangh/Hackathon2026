@@ -275,7 +275,29 @@ func (r *TmuxRunner) capture(ansi bool) (string, error) {
 	if ansi {
 		args = append(args, "-e")
 	}
-	return tmuxOut(context.Background(), args...)
+	out, err := tmuxOut(context.Background(), args...)
+	if err != nil {
+		return "", err
+	}
+	return normalizePane(out), nil
+}
+
+// normalizePane 归一化 pane 捕获：每行去掉补齐用的尾部空格、去掉末尾空行。
+// capture-pane 按行补满整宽，整行宽文本+\n 写入 xterm 会触发自动换行，
+// 造成"每行多一空行"的显示混乱（viewer 实测踩坑）；回放与增量共用本归一化。
+func normalizePane(s string) string {
+	lines := strings.Split(s, "\n")
+	for i := range lines {
+		lines[i] = strings.TrimRight(lines[i], " ")
+	}
+	end := len(lines)
+	for end > 0 && lines[end-1] == "" {
+		end--
+	}
+	if end == 0 {
+		return ""
+	}
+	return strings.Join(lines[:end], "\n") + "\n"
 }
 
 func tmuxRun(ctx context.Context, args ...string) error {

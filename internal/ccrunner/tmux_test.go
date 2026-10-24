@@ -124,6 +124,22 @@ func TestProbeEchoed(t *testing.T) {
 	}
 }
 
+func TestNormalizePane(t *testing.T) {
+	in := "hello     \nworld  \n\n\n"
+	got := normalizePane(in)
+	if got != "hello\nworld\n" {
+		t.Fatalf("归一化结果异常: %q", got)
+	}
+	if got := normalizePane("\n\n"); got != "" {
+		t.Fatalf("全空画面应为空: %q", got)
+	}
+	// 保留行内有意义的内容与 ANSI
+	in2 := "\x1b[32m绿\x1b[0m  \ntail"
+	if got := normalizePane(in2); got != "\x1b[32m绿\x1b[0m\ntail\n" {
+		t.Fatalf("ANSI/内容不应被破坏: %q", got)
+	}
+}
+
 func TestFailRunning(t *testing.T) {
 	r := &TmuxRunner{}
 	tk := &task{id: "t1", state: TaskRunning, started: time.Now()}

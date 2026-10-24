@@ -2,3 +2,4 @@ bin/
 *.test
 .bridge/
 .env
+.DS_Store

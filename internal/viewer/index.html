@@ -33,7 +33,9 @@ function connect() {
       if (term) term.dispose();
       term = new Terminal({
         cols: m.cols || 120, rows: m.rows || 40,
-        scrollback: 3000, fontSize: 12, convertEol: false,
+        scrollback: 3000, fontSize: 12,
+        // capture 的画面按纯 \n 分行, 需按 \r\n 解释才能每行回到行首(否则阶梯错位)
+        convertEol: true,
         theme: { background: '#1a1b26', foreground: '#d0d5e1' }
       });
       term.open(document.getElementById('term'));

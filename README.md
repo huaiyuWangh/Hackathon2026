@@ -3,7 +3,9 @@
 对着任意灵矽语音入口说一句"帮我修一下失败的测试"，Mac 上的 Claude Code 就开始干活，
 大屏（AirPlay）实时看它写代码，结果由语音播报回来。
 
-📺 演示视频：[docs/media/demo-voice-e2e-2026-10-23.mp4](docs/media/demo-voice-e2e-2026-10-23.mp4)（77s，M5 端到端语音闭环）
+📺 演示视频：
+- [语音端到端闭环](docs/media/demo-voice-e2e-2026-10-23.mp4)（77s，语音驱动 CC + 多轮工具调用）
+- [手机网页查看器](docs/media/demo-viewer-phone-2026-10-24.mp4)（手机浏览器实时看 CC 现场，局域网直连）
 
 - **Part 1 语音驱动 CC**（核心）：Mac 桥接程序作为灵矽设备接入（端侧 MCP），
   平台智能体通过工具调用驱动 tmux 会话中的交互式 Claude Code。
