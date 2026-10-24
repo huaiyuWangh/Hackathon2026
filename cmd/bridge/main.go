@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
@@ -20,6 +21,7 @@ import (
 	"github.com/huaiyuWangh/Hackathon2026/internal/linx"
 	"github.com/huaiyuWangh/Hackathon2026/internal/mcp"
 	"github.com/huaiyuWangh/Hackathon2026/internal/tools"
+	"github.com/huaiyuWangh/Hackathon2026/internal/viewer"
 	"github.com/huaiyuWangh/Hackathon2026/internal/webui"
 )
 
@@ -75,8 +77,9 @@ func run(argv []string) error {
 		defer stop()
 		reg := tools.NewRegistry(runner)
 		devClient := linx.New(&cfg, reg)
-		// 三通道并行: 设备接入(端侧MCP+音频) + MCP Proxy + HTTP(控制页/云端MCP)
-		done := make(chan error, 3)
+		// 四通道并行: 设备接入(端侧MCP+音频) + MCP Proxy + HTTP(控制页/云端MCP)
+		// + 查看器(局域网只读直播, 独立端口)
+		done := make(chan error, 4)
 		go func() { done <- devClient.Run(ctx) }()
 		go func() { done <- linx.NewProxyClient(cfg.McpProxyBase, cfg.APIKey, reg).Run(ctx) }()
 		go func() {
@@ -84,6 +87,12 @@ func run(argv []string) error {
 			webui.Mount(sse.Mux(), devClient)
 			log.Printf("控制页 http://%s/", cfg.SSEAddr)
 			done <- sse.ListenAndServe(cfg.SSEAddr)
+		}()
+		go func() {
+			vmux := http.NewServeMux()
+			viewer.Mount(vmux, runner)
+			log.Printf("查看器 http://%s/viewer (局域网可访问)", cfg.ViewerAddr)
+			done <- http.ListenAndServe(cfg.ViewerAddr, vmux)
 		}()
 		return <-done
 	case local && match(args, "tools", "list"):

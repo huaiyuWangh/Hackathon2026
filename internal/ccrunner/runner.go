@@ -1,6 +1,6 @@
 // Package ccrunner 驱动 tmux 会话中的交互式 Claude Code，是全项目的核心。
 // tmux 会话是唯一"现场"：语音链路（Part 1）经 Send 写入；
-// 投屏（Part 2 方案A）直接镜像该终端所在屏幕，方案B（迭代）从 Output() 订阅。
+// 投屏（Part 2 方案A）直接镜像该终端所在屏幕；方案B（viewer）从 Subscribe() 订阅。
 package ccrunner
 
 import "context"
@@ -20,9 +20,18 @@ type TaskStatus struct {
 	Summary string `json:"summary"`
 }
 
-// Chunk 一段增量输出（来自 tmux capture-pane，保留 ANSI 色彩）。
+// Chunk 一段增量输出（来自 tmux capture-pane，保留 ANSI 色彩；\f 表示全量重绘）。
 type Chunk struct {
 	Data []byte
+}
+
+// View 一次"现场"订阅：接入时的全量回放 + 之后的增量流。
+type View struct {
+	Cols   int    // tmux pane 宽（终端列数，保证渲染对齐）
+	Rows   int    // tmux pane 高
+	Replay string // 订阅时刻的全量 ANSI 帧
+	Ch     <-chan Chunk
+	Cancel func()
 }
 
 // Runner 驱动交互式 Claude Code 的运行时接口。
@@ -35,6 +44,6 @@ type Runner interface {
 	Status(taskID string) (TaskStatus, error)
 	// Interrupt 打断当前任务（Esc）。
 	Interrupt() error
-	// Output 返回输出增量流，供查看器订阅；方案B迭代时启用。
-	Output() <-chan Chunk
+	// Subscribe 订阅现场画面（viewer 用）；返回全量回放与增量流。
+	Subscribe() View
 }

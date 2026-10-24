@@ -1,6 +1,8 @@
 package ccrunner
 
 import (
+	"context"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -44,20 +46,88 @@ func (r *TmuxRunner) monitorLoop() {
 			first = false
 		}
 
-		r.mu.Lock()
-		r.lastPlain = plain
-		r.mu.Unlock()
-
-		if d := deltaOf(prev, ansi); d != "" {
-			select {
-			case r.outCh <- Chunk{Data: []byte(d)}:
-			default: // 无消费者或消费不及时则丢弃，不阻塞状态机
-			}
-		}
+		r.publish(ansi, plain, deltaOf(prev, ansi))
 		r.step(prev, ansi, plain, age)
-		r.setSample(ansi)
 		r.saveState()
 		prev, prevAt = ansi, time.Now()
+	}
+}
+
+// publish 原子地推进画面基线并广播增量：与 Subscribe 持同一把锁，
+// 订阅者要么拿到旧回放+进入广播列表，要么拿到新回放且不在本次广播列表，
+// 不会出现回放与增量重叠或缺失。
+func (r *TmuxRunner) publish(ansi, plain, delta string) {
+	r.mu.Lock()
+	r.lastANSI = ansi
+	r.lastPlain = plain
+	r.lastSampleAt = time.Now()
+	if cols, rows, ok := r.querySize(); ok {
+		r.paneCols, r.paneRows = cols, rows
+	}
+	subs := make([]chan Chunk, 0, len(r.subs))
+	for _, ch := range r.subs {
+		subs = append(subs, ch)
+	}
+	r.mu.Unlock()
+
+	if delta == "" {
+		return
+	}
+	for _, ch := range subs {
+		select {
+		case ch <- Chunk{Data: []byte(delta)}:
+		default: // 慢消费者丢帧，直播语义优先实时
+		}
+	}
+}
+
+// querySize 查询 tmux pane 尺寸（列/行），保证 viewer 终端渲染对齐。
+func (r *TmuxRunner) querySize() (int, int, bool) {
+	out, err := tmuxOut(context.Background(), "display-message", "-p", "-t", r.session, "#{pane_width} #{pane_height}")
+	if err != nil {
+		return 0, 0, false
+	}
+	fields := strings.Fields(strings.TrimSpace(out))
+	if len(fields) != 2 {
+		return 0, 0, false
+	}
+	cols, err1 := strconv.Atoi(fields[0])
+	rows, err2 := strconv.Atoi(fields[1])
+	if err1 != nil || err2 != nil {
+		return 0, 0, false
+	}
+	return cols, rows, true
+}
+
+// Subscribe 订阅现场画面：返回全量回放与增量流（viewer 用）。
+// 冷启动（monitor 未跑过）时先同步采一拍，保证订阅者拿到真实尺寸与画面。
+func (r *TmuxRunner) Subscribe() View {
+	r.startMonitor()
+	r.mu.Lock()
+	cold := r.paneCols == 0 || r.lastANSI == ""
+	r.mu.Unlock()
+	if cold {
+		r.syncSample()
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.subSeq++
+	id := r.subSeq
+	ch := make(chan Chunk, 128)
+	if r.subs == nil {
+		r.subs = make(map[int64]chan Chunk)
+	}
+	r.subs[id] = ch
+	return View{
+		Cols:   r.paneCols,
+		Rows:   r.paneRows,
+		Replay: r.lastANSI,
+		Ch:     ch,
+		Cancel: func() {
+			r.mu.Lock()
+			delete(r.subs, id)
+			r.mu.Unlock()
+		},
 	}
 }
 
@@ -74,12 +144,10 @@ func (r *TmuxRunner) syncSample() {
 		return
 	}
 	r.mu.Lock()
-	prev, at, oldPlain := r.lastANSI, r.lastSampleAt, plain
-	r.lastPlain = oldPlain
+	prev, at := r.lastANSI, r.lastSampleAt
 	r.mu.Unlock()
+	r.publish(ansi, plain, deltaOf(prev, ansi))
 	r.step(prev, ansi, plain, time.Since(at))
-	r.setSample(ansi)
-	r.saveState()
 }
 
 // step 单步状态机：画面稳定且无 busy 标记时结束运行中任务。纯逻辑，可单测。
@@ -129,15 +197,8 @@ func (r *TmuxRunner) failRunning(msg string) {
 	r.saveStateLocked()
 }
 
-func (r *TmuxRunner) setSample(ansi string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.lastANSI = ansi
-	r.lastSampleAt = time.Now()
-}
-
 // deltaOf 计算增量：新内容以旧内容为前缀则返回后缀；否则整体重绘，
-// 前缀 \f 供未来查看器识别为清屏信号。
+// 前缀 \f 供消费者识别为清屏信号。
 func deltaOf(prev, cur string) string {
 	if cur == "" || cur == prev {
 		return ""

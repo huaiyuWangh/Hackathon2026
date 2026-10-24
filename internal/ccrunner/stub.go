@@ -5,16 +5,15 @@ import (
 	"errors"
 )
 
-// NewStub 返回占位 Runner：M0 骨架可编译、--local CLI 可跑通，
-// 真实 tmux 驱动（M1）完成后替换。
+// NewStub 返回占位 Runner：无 tmux 环境也能列工具/装配骨架，真实驱动用 NewTmux。
 func NewStub() Runner { return stub{} }
 
 type stub struct{}
 
-func (stub) Ensure(ctx context.Context) error         { return errM1() }
-func (stub) Send(prompt string) (string, error)       { return "", errM1() }
-func (stub) Status(taskID string) (TaskStatus, error) { return TaskStatus{}, errM1() }
-func (stub) Interrupt() error                         { return errM1() }
-func (stub) Output() <-chan Chunk                     { return nil }
+func (stub) Ensure(ctx context.Context) error         { return errNoTmux() }
+func (stub) Send(prompt string) (string, error)       { return "", errNoTmux() }
+func (stub) Status(taskID string) (TaskStatus, error) { return TaskStatus{}, errNoTmux() }
+func (stub) Interrupt() error                         { return errNoTmux() }
+func (stub) Subscribe() View                          { return View{} }
 
-func errM1() error { return errors.New("ccrunner: M1 尚未实现 (tmux 驱动)") }
+func errNoTmux() error { return errors.New("ccrunner: 占位实现, 请用 NewTmux") }

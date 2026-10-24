@@ -28,15 +28,18 @@ type TmuxRunner struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 	once   sync.Once
-	outCh  chan Chunk
 
 	mu           sync.Mutex
 	seq          int
 	tasks        map[string]*task
 	last         *task
 	lastPlain    string // 最近一次捕获的纯文本，供运行中任务摘要
-	lastANSI     string // 最近一次捕获的 ANSI 画面（稳定性基线）
+	lastANSI     string // 最近一次捕获的 ANSI 画面（稳定性基线 + viewer 回放）
 	lastSampleAt time.Time
+	paneCols     int // tmux pane 尺寸（viewer 渲染对齐）
+	paneRows     int
+	subs         map[int64]chan Chunk // viewer 订阅者
+	subSeq       int64
 }
 
 type task struct {
@@ -82,8 +85,8 @@ func NewTmux(session, workDir string) (*TmuxRunner, error) {
 		claude:  claude,
 		ctx:     ctx,
 		cancel:  cancel,
-		outCh:   make(chan Chunk, 64),
 		tasks:   make(map[string]*task),
+		subs:    make(map[int64]chan Chunk),
 	}
 	r.loadState()
 	return r, nil
@@ -91,9 +94,6 @@ func NewTmux(session, workDir string) (*TmuxRunner, error) {
 
 // Close 停止后台监控；进程退出场景可不调用。
 func (r *TmuxRunner) Close() { r.cancel() }
-
-// Output 返回输出增量流（方案B迭代时订阅）；无消费者时自动丢弃。
-func (r *TmuxRunner) Output() <-chan Chunk { return r.outCh }
 
 // Ensure 确保 tmux 会话与其中交互式 claude 已就绪；不存在则创建并等启动。
 func (r *TmuxRunner) Ensure(ctx context.Context) error {

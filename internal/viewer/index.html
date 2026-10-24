@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CC 现场直播 · Hackathon2026</title>
+<link rel="stylesheet" href="/viewer/xterm.css">
+<style>
+  html,body{margin:0;height:100%;background:#1a1b26}
+  .term{padding:6px;overflow-x:auto}
+  .xterm{height:100vh}
+  #dot{position:fixed;top:10px;right:12px;width:9px;height:9px;border-radius:50%;
+       background:#f85149;box-shadow:0 0 6px rgba(248,81,73,.8);transition:background .3s}
+  #dot.on{background:#3fb950;box-shadow:0 0 6px rgba(63,185,80,.8)}
+</style>
+</head>
+<body>
+<div class="term" id="term"></div><div id="dot"></div>
+<script src="/viewer/xterm.js"></script>
+<script>
+const dot = document.getElementById('dot');
+let term = null;
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+  const ws = new WebSocket(proto + location.host + '/viewer/ws');
+  ws.binaryType = 'arraybuffer';
+  ws.onopen = () => dot.classList.add('on');
+  ws.onclose = () => { dot.classList.remove('on'); setTimeout(connect, 2000); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = ev => {
+    if (typeof ev.data === 'string') {           // init: 尺寸 + 全量回放
+      const m = JSON.parse(ev.data);
+      if (term) term.dispose();
+      term = new Terminal({
+        cols: m.cols || 120, rows: m.rows || 40,
+        scrollback: 3000, fontSize: 12, convertEol: false,
+        theme: { background: '#1a1b26', foreground: '#d0d5e1' }
+      });
+      term.open(document.getElementById('term'));
+      if (m.replay) term.write(m.replay);
+    } else if (term) {                           // 增量帧
+      term.write(new TextDecoder().decode(ev.data));
+    }
+  };
+}
+connect();
+</script>
+</body>
+</html>

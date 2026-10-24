@@ -26,6 +26,8 @@ bin/bridge serve              # 在你自己的终端里跑（麦克风权限归
 启动后：
 
 - **控制页** http://127.0.0.1:8787/ —— 大按钮开关麦克风（默认关闭），点亮后对着 Mac 说话
+- **查看器** http://<Mac局域网IP>:8788/viewer —— 手机/任意浏览器实时看 CC 现场
+  （xterm.js 终端镜像，只读、离线可用；二维码/地址在本机查看器页可取）
 - 语音链路：Mac 麦克风 → 灵矽 ASR/智能体（realtime 模式，服务端 VAD）→
   端侧工具 `dev.claude.*` → tmux 里的 Claude Code 干活 → 结果 TTS 从 Mac 播报
 - 看现场：`tmux attach -t ccline`（退出 `Ctrl+b` 再按 `d`）
@@ -53,12 +55,13 @@ echo '{"type":"mcp","payload":{"jsonrpc":"2.0","id":3,"method":"tools/call","par
 ## 项目结构
 
 ```
-cmd/bridge/       入口：装配 + --local 调试 CLI（tools/sim/mic-test）
+cmd/bridge/       入口：装配 + --local 调试 CLI（tools/sim/mic-test/play-test）
 internal/linx/    灵矽设备协议客户端 + 音频(PortAudio/Opus) + MCP Proxy 备用通道
 internal/mcp/     MCP 协议分发（JSON-RPC）+ HTTP/SSE 传输
 internal/tools/   业务工具 dev.claude.send / status / interrupt
-internal/ccrunner/  CC 运行时：tmux 驱动 + 任务状态机（核心）
-internal/webui/   麦克风控制页（go:embed 单页）
+internal/ccrunner/  CC 运行时：tmux 驱动 + 任务状态机 + 现场订阅（核心）
+internal/viewer/  网页查看器：xterm.js 终端直播（局域网 8788, 只读）
+internal/webui/   麦克风控制页（本机 8787, go:embed 单页）
 internal/config/  运行配置（环境变量 + .env）
 ```
 
@@ -72,5 +75,5 @@ internal/config/  运行配置（环境变量 + .env）
 | M1 | ccrunner：tmux 驱动交互式 CC | ✅ |
 | M2 | mcp 协议 + tools 本地全链路（--local sim 平台模拟） | ✅ |
 | M3 | linx 客户端接入灵矓平台 + 智能体联调 | ✅ |
-| M4 | （迭代）方案B 网页查看器 | ⬜ |
+| M4 | 方案B 网页查看器（局域网只读直播） | ✅ |
 | M5 | Mac 音频入口（realtime）+ 控制页 | ✅ 端到端闭环验证通过（2026-10-23，含多轮工具调用） |

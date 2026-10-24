@@ -116,7 +116,7 @@ SSE 传输层，业务零改动。
 | M1 | ccrunner：tmux 驱动交互式 CC、状态机、输出流 | `--local tools call dev.claude.send` 真跑（fake 程序 + 真实 CC 双冒烟通过） | ✅ |
 | M2 | mcp 协议 + tools 全链路（本地） | `--local sim` 用灵矓外层消息格式驱动真实 CC 全链路通过 + 单测 | ✅ |
 | M3 | linx 客户端接入灵矓平台，控制台配智能体 | 设备侧✅：连接/握手/initialize+tools/list 通过；智能体侧联调完成（见 §10.1） | ✅ |
-| M4 | （迭代）方案 B 网页查看器 internal/viewer | 手机浏览器实时看输出 | ⬜ |
+| M4 | 方案 B 网页查看器 internal/viewer | 手机浏览器实时看输出（局域网 8788, 冒烟通过） | ✅ |
 | M5 | Mac 音频入口（realtime 模式）+ 控制页 | 对着 Mac 说话驱动 CC（待用户麦克风授权后端到端验证） | 🔶 |
 
 ## 8. M1 实现要点（2026-10-23）
@@ -227,7 +227,24 @@ SSE 传输层，业务零改动。
 - 依赖：`brew install portaudio opus opusfile`；Makefile 已内置
   PKG_CONFIG_PATH（MacPorts 的 pkg-config 看不到 /usr/local）。
 
-## 11. 风险与对策
+## 11. M4 实现要点（网页查看器，2026-10-24）
+
+- **双端口隔离**：查看器独立监听 `BRIDGE_VIEWER_ADDR`（默认 `0.0.0.0:8788`，
+  只读直播，暴露给局域网——手机直接看）；控制页/MCP 留在 `127.0.0.1:8787`
+  不出内网（含 /api/mic，绝不上局域网）。
+- **现场订阅中心**：ccrunner 的 `Output()` 单通道改造为 `Subscribe() View`
+  （返回 pane 尺寸 + 全量回放 + 增量流 + 取消函数）。publish 与 Subscribe 持同一
+  把锁，订阅者要么"旧回放+进广播列表"、要么"新回放+不在列表"，不重不漏；
+  慢消费者丢帧（直播语义优先实时）。**冷启动坑**：monitor 未跑首拍时订阅拿到
+  cols=0 空回放——Subscribe 时若状态为空先同步采一拍（实测踩坑修复）。
+- **页面**：xterm.js + css 全部 go:embed（离线可用，演示场地无网也能看）；
+  WS 首条文本消息为 init JSON（尺寸+全量回放），之后增量以二进制帧推送
+  （协议无歧义）；ccrunner 的 `\f` 重绘标记翻译为 xterm 清屏序列
+  `\x1b[2J\x1b[H`（CC 的 TUI 动画频繁整屏重绘）。断线 2s 自动重连。
+- **验证**：单测（页面/资源/init/增量帧）+ fake tmux 会话真实冒烟
+  （cols=80 回放 + 实时增量）通过。
+
+## 12. 风险与对策
 
 | 风险 | 对策 |
 |------|------|

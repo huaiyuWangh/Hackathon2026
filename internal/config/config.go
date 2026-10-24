@@ -31,6 +31,8 @@ type Config struct {
 	McpProxyBase string
 	// SSEAddr 云端 MCP 的 HTTP+SSE 监听地址（配合 cloudflared 隧道暴露）。
 	SSEAddr string
+	// ViewerAddr 网页查看器监听地址（局域网可访问，只读直播）。
+	ViewerAddr string
 	// Audio 启用设备音频（Mac 麦克风/扬声器作为语音入口，端侧 MCP 会话关键）。
 	Audio bool
 	// Debug 输出收发的原始消息（联调排障用）。
@@ -51,6 +53,7 @@ func Load() Config {
 		WorkDir:      workDir,
 		McpProxyBase: getenv("BRIDGE_MCP_PROXY_BASE", "https://xrobo.qiniu.com"),
 		SSEAddr:      getenv("BRIDGE_SSE_ADDR", "127.0.0.1:8787"),
+		ViewerAddr:   getenv("BRIDGE_VIEWER_ADDR", "0.0.0.0:8788"),
 		Audio:        getenv("BRIDGE_AUDIO", "") != "",
 		Debug:        getenv("BRIDGE_DEBUG", "") != "",
 	}

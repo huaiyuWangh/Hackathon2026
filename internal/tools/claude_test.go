@@ -30,7 +30,7 @@ func (f *fakeRunner) Send(p string) (string, error) {
 }
 func (f *fakeRunner) Status(id string) (ccrunner.TaskStatus, error) { return f.status, f.statErr }
 func (f *fakeRunner) Interrupt() error                              { return f.intErr }
-func (f *fakeRunner) Output() <-chan ccrunner.Chunk                 { return nil }
+func (f *fakeRunner) Subscribe() ccrunner.View                      { return ccrunner.View{} }
 
 func mustCall(t *testing.T, reg *Registry, name string, args string) *mcp.CallResult {
 	t.Helper()
