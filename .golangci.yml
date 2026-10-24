@@ -8,6 +8,3 @@ linters:
     rules:
       - linters: [errcheck]
         text: 'Error return value of `(.*\.Close|w\.Write|portaudio\.Terminate|conn\.WriteMessage|.*Set(Read|Write)Deadline|os\.Setenv|fmt\.Fprint(f)?|.*\.ReadFrom)`'
-
-output:
-  sort-results: true
