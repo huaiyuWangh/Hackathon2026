@@ -43,3 +43,35 @@ func TestDetectMAC(t *testing.T) {
 		t.Fatal("MAC 不应含空格")
 	}
 }
+
+func TestLoadDefaultsAndOverrides(t *testing.T) {
+	// 全部留空 → 默认值；ClientID 落在临时 workDir，不污染包目录
+	t.Setenv("BRIDGE_WORK_DIR", t.TempDir())
+	for _, k := range []string{"BRIDGE_LINX_WS_URL", "BRIDGE_DEVICE_ID", "BRIDGE_API_KEY",
+		"BRIDGE_TMUX_SESSION", "BRIDGE_MCP_PROXY_BASE", "BRIDGE_SSE_ADDR",
+		"BRIDGE_VIEWER_ADDR", "BRIDGE_AUDIO", "BRIDGE_DEBUG"} {
+		t.Setenv(k, "")
+	}
+	cfg := Load()
+	if cfg.LinxWSURL != "wss://xrobo-io.qiniuapi.com/v1/ws/" || cfg.TmuxSession != "ccline" ||
+		cfg.SSEAddr != "127.0.0.1:8787" || cfg.ViewerAddr != "0.0.0.0:8788" ||
+		cfg.McpProxyBase != "https://xrobo.qiniu.com" || cfg.WorkDir == "." {
+		t.Fatalf("默认值异常: %+v", cfg)
+	}
+	if cfg.DeviceID == "" || cfg.ClientID == "" {
+		t.Fatalf("DeviceID/ClientID 应自动生成: %+v", cfg)
+	}
+	if cfg.Audio || cfg.Debug {
+		t.Fatal("BRIDGE_AUDIO/DEBUG 留空应为 false")
+	}
+
+	// 环境变量覆盖全部生效
+	t.Setenv("BRIDGE_LINX_WS_URL", "ws://x")
+	t.Setenv("BRIDGE_API_KEY", "k")
+	t.Setenv("BRIDGE_AUDIO", "1")
+	t.Setenv("BRIDGE_TMUX_SESSION", "s2")
+	cfg = Load()
+	if cfg.LinxWSURL != "ws://x" || cfg.APIKey != "k" || !cfg.Audio || cfg.TmuxSession != "s2" {
+		t.Fatalf("覆盖未生效: %+v", cfg)
+	}
+}

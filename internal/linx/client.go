@@ -96,7 +96,7 @@ func (c *Client) SetMic(on bool) (bool, error) {
 		return false, errors.New("音频未启用 (BRIDGE_AUDIO=1 才能控制麦克风)")
 	}
 	c.audio.SetMuted(!on)
-	return c.audio.Muted() == false, nil
+	return !c.audio.Muted(), nil
 }
 
 // MicOn 麦克风是否开启。
@@ -243,8 +243,8 @@ func (c *Client) loop(ctx context.Context, conn *websocket.Conn) error {
 			wg.Wait()
 			return err
 		}
-		switch {
-		case mt == websocket.BinaryMessage:
+		switch mt {
+		case websocket.BinaryMessage:
 			// 平台 TTS 的 Opus 音频帧；间隔偶发过大是断续的直接原因
 			now := time.Now()
 			if !c.lastAudioAt.IsZero() && now.Sub(c.lastAudioAt) > 150*time.Millisecond {
@@ -254,7 +254,7 @@ func (c *Client) loop(ctx context.Context, conn *websocket.Conn) error {
 			if c.audio != nil {
 				c.audio.PlayOpus(msg)
 			}
-		case mt == websocket.TextMessage:
+		case websocket.TextMessage:
 			if c.cfg.Debug {
 				log.Printf("<< %s", msg)
 			}

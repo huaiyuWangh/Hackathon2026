@@ -1,6 +1,9 @@
 package ccrunner
 
 import (
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -141,7 +144,7 @@ func TestNormalizePane(t *testing.T) {
 }
 
 func TestFailRunning(t *testing.T) {
-	r := &TmuxRunner{}
+	r := newBareRunner(t)
 	tk := &task{id: "t1", state: TaskRunning, started: time.Now()}
 	r.last = tk
 	r.failRunning("boom")
@@ -151,12 +154,109 @@ func TestFailRunning(t *testing.T) {
 }
 
 func TestStatusIdleAndUnknown(t *testing.T) {
-	r := &TmuxRunner{}
+	r := newBareRunner(t)
 	st, err := r.Status("")
 	if err != nil || st.State != TaskIdle {
 		t.Fatalf("无任务应返回 idle: %+v %v", st, err)
 	}
 	if _, err := r.Status("t99"); err == nil {
 		t.Fatal("未知任务应报错")
+	}
+}
+
+func TestAbsDir(t *testing.T) {
+	wd, _ := os.Getwd()
+	for dir, want := range map[string]string{
+		"":       wd,
+		".":      wd,
+		"sub":    filepath.Join(wd, "sub"),
+		"/abs/x": "/abs/x",
+	} {
+		got, err := absDir(dir)
+		if err != nil || got != want {
+			t.Errorf("absDir(%q) = %q, %v; want %q", dir, got, err, want)
+		}
+	}
+}
+
+func TestNewTaskSupersedesRunning(t *testing.T) {
+	r := newBareRunner(t)
+	id1 := r.newTask("第一条")
+	id2 := r.newTask("第二条")
+	if r.tasks[id1].state != TaskFailed || !strings.Contains(r.tasks[id1].summary, "覆盖") {
+		t.Fatalf("旧任务应被覆盖判失败: %+v", r.tasks[id1])
+	}
+	if r.last == nil || r.last.id != id2 || r.last.state != TaskRunning {
+		t.Fatalf("新任务应为 running 的 last: %+v", r.last)
+	}
+}
+
+func TestSendEmptyPrompt(t *testing.T) {
+	r := newBareRunner(t)
+	for _, p := range []string{"", "  ", "\n\t "} {
+		if _, err := r.Send(p); err == nil || !strings.Contains(err.Error(), "空 prompt") {
+			t.Errorf("空 prompt 应报错: %q → %v", p, err)
+		}
+	}
+}
+
+func TestInterruptWithoutSession(t *testing.T) {
+	r := newBareRunner(t) // session 名不存在的会话
+	if err := r.Interrupt(); err == nil || !strings.Contains(err.Error(), "不存在") {
+		t.Fatalf("无会话时打断应报错: %v", err)
+	}
+}
+
+func TestPublishAndSubscribe(t *testing.T) {
+	r := newBareRunner(t)
+	v := r.Subscribe() // 冷启动：capture 失败走 failRunning, 不 panic
+	if v.Ch == nil || v.Cancel == nil {
+		t.Fatalf("订阅应返回增量流与取消函数: %+v", v)
+	}
+
+	// 全量重绘增量应广播给订阅者；无增量不广播（慢消费者语义）
+	r.publish("ansi1", "plain1", "\fansi1")
+	select {
+	case c := <-v.Ch:
+		if string(c.Data) != "\fansi1" {
+			t.Fatalf("增量内容异常: %q", c.Data)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("增量未到达")
+	}
+	r.publish("ansi1", "plain1", "")
+	select {
+	case c := <-v.Ch:
+		t.Fatalf("无增量不应广播: %q", c.Data)
+	default:
+	}
+
+	// 取消订阅后不再接收
+	v.Cancel()
+	r.publish("ansi2", "plain2", "\fansi2")
+	select {
+	case c := <-v.Ch:
+		t.Fatalf("取消后不应再收到: %q", c.Data)
+	default:
+	}
+}
+
+func TestMonitorLoopRunsAndStops(t *testing.T) {
+	r := newBareRunner(t)
+	go r.monitorLoop()
+	time.Sleep(1200 * time.Millisecond) // ≥2 个 tick: capture 失败路径反复执行
+	r.cancel()                          // ctx 取消后循环应退出（不 panic、不死锁）
+	time.Sleep(100 * time.Millisecond)
+	if _, err := os.Stat(r.statePath()); err != nil {
+		t.Fatalf("监控循环应持久化状态: %v", err)
+	}
+}
+
+func TestNewTmuxRequiresClaudeAndTmux(t *testing.T) {
+	if _, err := exec.LookPath("claude"); err == nil {
+		t.Skip("本机已装 claude, 缺依赖分支在 CI 上验证")
+	}
+	if _, err := NewTmux("s", t.TempDir()); err == nil || !strings.Contains(err.Error(), "claude") {
+		t.Fatalf("缺 claude 应报错: %v", err)
 	}
 }

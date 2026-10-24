@@ -1,5 +1,6 @@
 bin/
 *.test
+coverage.txt
 .bridge/
 .env
 .DS_Store

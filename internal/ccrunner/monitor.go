@@ -41,7 +41,7 @@ func (r *TmuxRunner) monitorLoop() {
 			base, baseAt := r.lastANSI, r.lastSampleAt
 			r.mu.Unlock()
 			if base != "" && !baseAt.IsZero() {
-				prev, prevAt, age = base, baseAt, time.Since(baseAt)
+				prev, age = base, time.Since(baseAt)
 			}
 			first = false
 		}

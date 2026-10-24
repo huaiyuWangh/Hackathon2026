@@ -1,5 +1,5 @@
 // Package brand 提供 VoiceCopilot 的品牌资产（当前：方形图标 SVG）。
-// go:embed 无法引用仓库根之外的路径，故 icon.svg 在此存一份，
+// 注意: embed 无法引用仓库根之外的路径，故 icon.svg 在此存一份，
 // 源头版本维护在 docs/brand/logo.svg（两者应保持一致）。
 package brand
 

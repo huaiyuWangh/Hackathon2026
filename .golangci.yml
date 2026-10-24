@@ -1,0 +1,13 @@
+version: "2"
+
+# 只用 golangci-lint 默认 linter 集（errcheck/govet/ineffassign/staticcheck/unused），
+# 额外排除"清理型"调用的 errcheck 噪音：Close/Terminate/Deadline 等
+# 退出路径上的 best-effort 调用，失败也无从处理。
+linters:
+  exclusions:
+    rules:
+      - linters: [errcheck]
+        text: 'Error return value of `(.*\.Close|w\.Write|portaudio\.Terminate|conn\.WriteMessage|.*Set(Read|Write)Deadline|os\.Setenv|fmt\.Fprint(f)?|.*\.ReadFrom)`'
+
+output:
+  sort-results: true

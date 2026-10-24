@@ -14,9 +14,8 @@ import (
 )
 
 type fakeSource struct {
-	ch     chan ccrunner.Chunk
-	view   ccrunner.View
-	closed int
+	ch   chan ccrunner.Chunk
+	view ccrunner.View
 }
 
 func (f *fakeSource) Subscribe() ccrunner.View {

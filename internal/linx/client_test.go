@@ -92,7 +92,7 @@ func TestClientEndToEnd(t *testing.T) {
 
 	var sawHello, sawResp1, sawResp2 bool
 	connsCount := 0
-	for !(sawHello && sawResp1 && sawResp2 && connsCount >= 2) {
+	for !sawHello || !sawResp1 || !sawResp2 || connsCount < 2 {
 		select {
 		case c := <-conns:
 			connsCount = c

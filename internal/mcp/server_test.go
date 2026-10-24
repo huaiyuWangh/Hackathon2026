@@ -52,6 +52,13 @@ func TestHandleToolsListAndCall(t *testing.T) {
 	}
 }
 
+func TestErrResult(t *testing.T) {
+	r := ErrResult("boom")
+	if !r.IsError || len(r.Content) != 1 || r.Content[0].Text != "boom" {
+		t.Fatalf("ErrResult 应为业务错误文本: %+v", r)
+	}
+}
+
 func TestHandleUnknownToolMapsTo32601(t *testing.T) {
 	s := NewServer(fakeProvider{})
 	params, _ := json.Marshal(map[string]any{"name": "nope"})
