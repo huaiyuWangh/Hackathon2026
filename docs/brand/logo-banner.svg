@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 320" role="img" aria-label="VoiceCopilot banner">
+  <defs>
+    <linearGradient id="bgb" x1="0" y1="0" x2="0" y2="320" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1f2335"/>
+      <stop offset="1" stop-color="#16161e"/>
+    </linearGradient>
+    <linearGradient id="waveb" x1="140" y1="0" x2="232" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7aa2f7"/>
+      <stop offset="1" stop-color="#7dcfff"/>
+    </linearGradient>
+    <linearGradient id="wordb" x1="590" y1="0" x2="990" y2="0" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7aa2f7"/>
+      <stop offset="1" stop-color="#7dcfff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="320" rx="28" fill="url(#bgb)"/>
+
+  <g transform="translate(48,40) scale(0.4375)">
+    <g transform="translate(0,-10)">
+      <polygon points="156,268 118,158 212,210" fill="#c0caf5" stroke="#c0caf5" stroke-width="14" stroke-linejoin="round"/>
+      <polygon points="356,268 394,158 300,210" fill="#c0caf5" stroke="#c0caf5" stroke-width="14" stroke-linejoin="round"/>
+      <polygon points="158,240 140,182 186,209" fill="#bb9af7" stroke="#bb9af7" stroke-width="7" stroke-linejoin="round"/>
+      <polygon points="354,240 372,182 326,209" fill="#bb9af7" stroke="#bb9af7" stroke-width="7" stroke-linejoin="round"/>
+      <circle cx="256" cy="316" r="130" fill="#c0caf5"/>
+      <path d="M120 316 A148 148 0 0 1 392 316" fill="none" stroke="#7aa2f7" stroke-width="26" stroke-linecap="round"/>
+      <circle cx="206" cy="304" r="15" fill="#1f2335"/>
+      <circle cx="306" cy="304" r="15" fill="#1f2335"/>
+      <circle cx="211" cy="298" r="5" fill="#ffffff"/>
+      <circle cx="311" cy="298" r="5" fill="#ffffff"/>
+      <polygon points="256,336 246,324 266,324" fill="#f7768e" stroke="#f7768e" stroke-width="4" stroke-linejoin="round"/>
+      <g stroke="#9aa5ce" stroke-width="7" stroke-linecap="round">
+        <line x1="180" y1="352" x2="140" y2="368"/>
+        <line x1="180" y1="370" x2="144" y2="388"/>
+        <line x1="332" y1="352" x2="372" y2="368"/>
+        <line x1="332" y1="370" x2="368" y2="388"/>
+      </g>
+      <rect x="210" y="388" width="12" height="14" rx="6" fill="url(#waveb)"/>
+      <rect x="230" y="381" width="12" height="28" rx="6" fill="url(#waveb)"/>
+      <rect x="250" y="373" width="12" height="44" rx="6" fill="url(#waveb)"/>
+      <rect x="270" y="383" width="12" height="24" rx="6" fill="url(#waveb)"/>
+      <rect x="290" y="387" width="12" height="16" rx="6" fill="url(#waveb)"/>
+      <rect x="100" y="274" width="44" height="84" rx="22" fill="#7aa2f7"/>
+      <rect x="368" y="274" width="44" height="84" rx="22" fill="#7aa2f7"/>
+      <rect x="110" y="288" width="24" height="56" rx="12" fill="#24283b"/>
+      <rect x="378" y="288" width="24" height="56" rx="12" fill="#24283b"/>
+    </g>
+  </g>
+
+  <text x="336" y="176" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif" font-size="96" font-weight="700" letter-spacing="-2">
+    <tspan fill="#c0caf5">Voice</tspan><tspan fill="url(#wordb)">Copilot</tspan>
+  </text>
+  <text x="340" y="234" font-family="-apple-system, 'SF Pro Display', 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif" font-size="30" fill="#9aa5ce">
+    对设备说句话，你的 Mac 就开始写代码，结果读给你听。
+  </text>
+</svg>
