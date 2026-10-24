@@ -63,14 +63,16 @@ jobs:
           path: coverage.txt
           retention-days: 14
 
-      # 公开仓库走 OIDC 无 token 上传（codecov 已收紧 tokenless 政策）；
-      # 失败不阻断 CI
+      # codecov 已收紧政策：push 上传必须 repo 已激活 + token。
+      # 配好仓库 secret CODECOV_TOKEN 后自动切到 token 上传，否则退回 OIDC；
+      # 上传失败不阻断 CI
       - name: Upload to Codecov
         if: success()
         uses: codecov/codecov-action@v5
         with:
           files: coverage.txt
-          use_oidc: true
+          token: ${{ secrets.CODECOV_TOKEN }}
+          use_oidc: ${{ secrets.CODECOV_TOKEN == '' }}
           fail_ci_if_error: false
 
   lint:
