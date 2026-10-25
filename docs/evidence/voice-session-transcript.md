@@ -1,6 +1,6 @@
 # 真实语音会话实录（端到端证据）
 
-> 来源：灵矽平台 chat-history API 原始记录（未改写，仅脱敏设备 MAC）。
+> 来源：灵矽平台 chat-history API 原始记录（内容未改写；仅脱敏设备 MAC，并统一平台名用字为「灵矽」）。
 > 会话 `2WsYAIlLdgKBXgYA` · 2026-10-23 20:21–20:25 · 设备 `f0:2f:4b:••:••:••` · realtime 模式（服务端 VAD）。
 > 同场景演示视频：[docs/media/demo-voice-e2e-2026-10-23.mp4](../media/demo-voice-e2e-2026-10-23.mp4)（77s）
 
