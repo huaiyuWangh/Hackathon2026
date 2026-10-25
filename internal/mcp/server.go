@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-// ErrUnknownTool 工具未注册；按灵矓文档映射为 JSON-RPC -32601。
+// ErrUnknownTool 工具未注册；按灵矽文档映射为 JSON-RPC -32601。
 var ErrUnknownTool = errors.New("mcp: 未知工具")
 
 // ToolProvider 业务工具集合，由 internal/tools 实现。
@@ -37,7 +37,7 @@ func (s *Server) Handle(ctx context.Context, req *Request) *Response {
 			"serverInfo":      map[string]any{"name": "bridge-mac", "version": "1.0.0"},
 		})
 	case "tools/list":
-		// nextCursor 显式为 null（灵矓文档标准格式），部分客户端要求该字段存在
+		// nextCursor 显式为 null（灵矽文档标准格式），部分客户端要求该字段存在
 		return ok(req.ID, struct {
 			Tools      []ToolDescriptor `json:"tools"`
 			NextCursor *string          `json:"nextCursor"`
@@ -61,7 +61,7 @@ func (s *Server) handleCall(ctx context.Context, req *Request) *Response {
 	if err != nil {
 		code := ErrInternal
 		if errors.Is(err, ErrUnknownTool) {
-			code = ErrMethodNotFound // 灵矓文档：未知工具返回 -32601
+			code = ErrMethodNotFound // 灵矽文档：未知工具返回 -32601
 		}
 		return errResp(req.ID, code, err.Error())
 	}

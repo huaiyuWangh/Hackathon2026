@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// SSEServer 是 MCP 的 HTTP+SSE 传输（灵矓云端 MCP 接入形态）：
+// SSEServer 是 MCP 的 HTTP+SSE 传输（灵矽云端 MCP 接入形态）：
 // GET /mcp 建立 SSE 长连接（首个 endpoint 事件告知回传地址，带 sessionId），
 // POST /mcp/message 接收平台的 JSON-RPC 请求，响应写回对应会话的 SSE 流。
 // 平台调用时自动携带 X-Linx-Device-Id / X-Linx-Agent-Id / X-Linx-Session-Id。

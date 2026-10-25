@@ -1,5 +1,5 @@
 // bridge 是灵矽语音驱动 Claude Code 的 Mac 桥接程序。
-// serve=灵矓设备客户端(M3)；--local 提供不依赖平台的本地调试/模拟。
+// serve=灵矽设备客户端(M3)；--local 提供不依赖平台的本地调试/模拟。
 package main
 
 import (
@@ -28,11 +28,11 @@ import (
 const usageText = `bridge — 灵矽语音驱动 Claude Code 的 Mac 桥接程序
 
 用法:
-  bridge serve                       启动桥接服务 (灵矓设备客户端, M3 实现)
+  bridge serve                       启动桥接服务 (灵矽设备客户端, M3 实现)
   bridge --local tools list          本地调试: 列出全部工具
   bridge --local tools call <name> [--arg key=value]...
-                                     本地调试: 绕过灵矓平台直接调用工具
-  bridge --local sim                 平台模拟: stdin 逐行读灵矓外层消息
+                                     本地调试: 绕过灵矽平台直接调用工具
+  bridge --local sim                 平台模拟: stdin 逐行读灵矽外层消息
                                      {"type":"mcp","payload":{JSON-RPC}}, 走完整
                                      协议链路后将响应外层消息写回 stdout
 

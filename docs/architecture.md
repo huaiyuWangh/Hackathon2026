@@ -120,8 +120,8 @@ SSE 传输层，业务零改动。
 |------|------|----------|------|
 | M0 | 骨架 + config + --local CLI | `bridge --local tools list` 列出工具 | ✅ |
 | M1 | ccrunner：tmux 驱动交互式 CC、状态机、输出流 | `--local tools call dev.claude.send` 真跑（fake 程序 + 真实 CC 双冒烟通过） | ✅ |
-| M2 | mcp 协议 + tools 全链路（本地） | `--local sim` 用灵矓外层消息格式驱动真实 CC 全链路通过 + 单测 | ✅ |
-| M3 | linx 客户端接入灵矓平台，控制台配智能体 | 设备侧✅：连接/握手/initialize+tools/list 通过；智能体侧联调完成（见 §10.1） | ✅ |
+| M2 | mcp 协议 + tools 全链路（本地） | `--local sim` 用灵矽外层消息格式驱动真实 CC 全链路通过 + 单测 | ✅ |
+| M3 | linx 客户端接入灵矽平台，控制台配智能体 | 设备侧✅：连接/握手/initialize+tools/list 通过；智能体侧联调完成（见 §10.1） | ✅ |
 | M4 | 方案 B 网页查看器 internal/viewer | 手机浏览器实时看输出（局域网 8788, 冒烟通过） | ✅ |
 | M5 | Mac 音频入口（realtime 模式）+ 控制页 | 对着 Mac 说话驱动 CC（待用户麦克风授权后端到端验证） | 🔶 |
 
@@ -153,7 +153,7 @@ SSE 传输层，业务零改动。
 - **`bridge --local sim`**：平台下行模拟器。stdin 逐行读外层消息，走完整协议
   链路（Envelope→JSON-RPC→mcp→tools→ccrunner→真实 CC）后把响应外层消息写回
   stdout。与 M3 的差别仅在传输层：把 stdin/stdout 换成设备 WebSocket。
-- **协议细节对齐灵矓文档**：tools/list 增加推荐格式的 `type` 字段（0=tool 函数）；
+- **协议细节对齐灵矽文档**：tools/list 增加推荐格式的 `type` 字段（0=tool 函数）；
   未知工具错误映射 JSON-RPC -32601（文档示例错误码）；inputSchema 无必填参数时
   省略 `required`（不输出 null）。
 - **serve 装配预就绪**：`bridge serve` 已完成 runner→registry→linx.New 装配，

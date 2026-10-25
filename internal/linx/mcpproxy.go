@@ -13,9 +13,9 @@ import (
 	"github.com/huaiyuWangh/Hackathon2026/internal/mcp"
 )
 
-// ProxyClient 通过灵矓 MCP Proxy（WebSocket 代理）把本机 MCP 服务暴露给平台，
+// ProxyClient 通过灵矽 MCP Proxy（WebSocket 代理）把本机 MCP 服务暴露给平台，
 // 无需公网地址——连接方向是本机主动出站。代理侧扮演 MCP 客户端：
-// 连接后主动下发 initialize / tools/list / tools/call（裸 JSON-RPC，无灵矓外层信封），
+// 连接后主动下发 initialize / tools/list / tools/call（裸 JSON-RPC，无灵矽外层信封），
 // 与设备端 MCP 的差别仅在传输层与消息封装。
 type ProxyClient struct {
 	base   string // 平台 API 基地址，如 https://xrobo.qiniu.com

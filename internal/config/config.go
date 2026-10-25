@@ -27,7 +27,7 @@ type Config struct {
 	TmuxSession string
 	// WorkDir Claude Code 的工作目录（同时存放 .bridge 运行时状态）。
 	WorkDir string
-	// McpProxyBase 灵矓平台 API 基地址（MCP Proxy 用）。
+	// McpProxyBase 灵矽平台 API 基地址（MCP Proxy 用）。
 	McpProxyBase string
 	// SSEAddr 云端 MCP 的 HTTP+SSE 监听地址（配合 cloudflared 隧道暴露）。
 	SSEAddr string

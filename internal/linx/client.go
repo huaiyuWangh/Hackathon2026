@@ -33,7 +33,7 @@ type wireMsg struct {
 	data []byte
 }
 
-// Client 灵矓设备客户端：连接 → header 鉴权 → hello 握手 → 收发循环。
+// Client 灵矽设备客户端：连接 → header 鉴权 → hello 握手 → 收发循环。
 // 可选音频（BRIDGE_AUDIO=1）：Mac 麦克风/扬声器即语音入口，会话锚定本设备，
 // 端侧 MCP 工具随会话可用。无应用层心跳（依赖标准 WebSocket ping/pong），
 // 断线指数退避重连；会话恢复靠异步工具对（重连后 dev.claude.status）。

@@ -5,7 +5,7 @@
 
 ## 一句话
 
-**VoiceCopilot** 是灵矓（Qiniu Xrobot）平台上的语音编程副驾驶：对任意灵矓语音入口说一句话
+**VoiceCopilot** 是灵矽（Qiniu Xrobot）平台上的语音编程副驾驶：对任意灵矽语音入口说一句话
 （"帮我修一下失败的测试"），Mac 上的 Claude Code 开始干活，结果语音播报，
 大屏 / 手机网页实时看它写代码。**嘴下指令、耳朵听结果、眼睛随时看。**
 
@@ -42,7 +42,7 @@ make lint          # golangci-lint 应 0 issues
 
 ```
 cmd/bridge/          入口：serve 装配四通道 + --local 调试 CLI
-internal/linx/       灵矓设备协议客户端 + 音频(PortAudio/Opus) + MCP Proxy 备用通道
+internal/linx/       灵矽设备协议客户端 + 音频(PortAudio/Opus) + MCP Proxy 备用通道
 internal/mcp/        MCP 协议分发(JSON-RPC) + HTTP/SSE 传输
 internal/tools/      业务工具 dev.claude.send / status / interrupt
 internal/ccrunner/   CC 运行时：tmux 驱动 + 任务状态机 + 现场订阅（核心）

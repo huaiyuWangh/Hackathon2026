@@ -64,6 +64,6 @@ func TestHandleUnknownToolMapsTo32601(t *testing.T) {
 	params, _ := json.Marshal(map[string]any{"name": "nope"})
 	resp := s.Handle(context.Background(), &Request{Method: "tools/call", Params: params})
 	if resp.Error == nil || resp.Error.Code != ErrMethodNotFound {
-		t.Fatalf("未知工具应映射 -32601 (灵矓文档), 得到 %+v", resp.Error)
+		t.Fatalf("未知工具应映射 -32601 (灵矽文档), 得到 %+v", resp.Error)
 	}
 }

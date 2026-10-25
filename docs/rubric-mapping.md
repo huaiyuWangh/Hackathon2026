@@ -33,7 +33,7 @@
 
 ## AI 价值呈现（15%）
 
-- **核心叙事：Agent 指挥 Agent**——灵矓平台智能体（调度）↔ Claude Code（执行），人只负责说和听；README 双 Agent 时序图
+- **核心叙事：Agent 指挥 Agent**——灵矽平台智能体（调度）↔ Claude Code（执行），人只负责说和听；README 双 Agent 时序图
 - **真实会话实录**（最强证据）：[voice-session-transcript.md](evidence/voice-session-transcript.md)
   - 平台 chat-history API 原始记录，2026-10-23，31 条消息：5 轮用户语音、10 条工具调用记录
   - 证明：智能体**自主决定**调 `dev.claude_send`；异步轮询 `dev.claude_status`；**多轮上下文**（第三问直接复用前次分析、未再调工具）；结果拆句 TTS 播报
